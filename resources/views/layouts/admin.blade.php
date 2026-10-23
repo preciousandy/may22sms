@@ -18,8 +18,54 @@
     $isActive = function(string $path): bool {
         return request()->is($path) || request()->is($path . '/*');
     };
+
+    // Pending notification counts
+    $navCounts = [
+        'orders' => \App\Models\LogOrder::where('status', 'pending')->count() 
+                  + \App\Models\SmsOrder::whereIn('status', ['PENDING', 'WAITING', 'pending'])->count() 
+                  + \App\Models\BoostOrder::whereIn('status', ['pending', 'processing'])->count(),
+        'reports' => \App\Models\OrderReport::where('status', 'pending')->count(),
+        'users' => \App\Models\User::where('account_status', 'pending')->count(),
+        'boosting' => \App\Models\BoostOrder::whereIn('status', ['pending', 'processing'])->count(),
+        'funding' => \App\Models\FundingTransaction::whereIn('status', ['pending', 'initiated', 'waiting_payment'])->count(),
+        'tickets' => \App\Models\SupportTicket::where('status', 'open')->count(),
+        'reviews' => \App\Models\Review::where('is_approved', false)->count(),
+    ];
 @endphp
-<div x-data="{ sidebarOpen: false }" class="flex h-screen bg-gray-100 font-sans">
+<div x-data="{ 
+    sidebarOpen: false,
+    attendedCounts: JSON.parse(localStorage.getItem('admin_attended_menu') || '{}'),
+    markAttended(key, count) {
+        if (!key) return;
+        this.attendedCounts[key] = Number(count);
+        try {
+            localStorage.setItem('admin_attended_menu', JSON.stringify(this.attendedCounts));
+        } catch (e) {}
+    },
+    isAttended(key, count) {
+        if (!count || Number(count) <= 0) return true;
+        return (this.attendedCounts[key] !== undefined && Number(this.attendedCounts[key]) >= Number(count));
+    },
+    toggleAttended(key, count) {
+        if (this.isAttended(key, count)) {
+            delete this.attendedCounts[key];
+        } else {
+            this.attendedCounts[key] = Number(count);
+        }
+        try {
+            localStorage.setItem('admin_attended_menu', JSON.stringify(this.attendedCounts));
+        } catch (e) {}
+    }
+}" 
+x-init="
+    @if($isActive('admin/orders')) markAttended('orders', {{ $navCounts['orders'] }}); @endif
+    @if($isActive('admin/reports')) markAttended('reports', {{ $navCounts['reports'] }}); @endif
+    @if($isActive('admin/users')) markAttended('users', {{ $navCounts['users'] }}); @endif
+    @if($isActive('admin/boosting')) markAttended('boosting', {{ $navCounts['boosting'] }}); @endif
+    @if($isActive('admin/funding')) markAttended('funding', {{ $navCounts['funding'] }}); @endif
+    @if($isActive('admin/tickets')) markAttended('tickets', {{ $navCounts['tickets'] }}); @endif
+    @if($isActive('admin/reviews')) markAttended('reviews', {{ $navCounts['reviews'] }}); @endif
+" class="flex h-screen bg-gray-100 font-sans">
     
     <!-- Mobile sidebar backdrop -->
     <div x-show="sidebarOpen" class="fixed inset-0 z-20 bg-black/60 backdrop-blur-sm lg:hidden" @click="sidebarOpen = false" style="display: none;"></div>
@@ -49,26 +95,84 @@
                 </a>
 
                 @if($can('orders'))
-                    <a href="/admin/orders" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/orders') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z"></path></svg>
-                        Orders & Refunds
+                    <a href="/admin/orders" @click="markAttended('orders', {{ $navCounts['orders'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/orders') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z"></path></svg>
+                            Orders & Refunds
+                        </span>
+                        @if(($navCounts['orders'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('orders', {{ $navCounts['orders'] }})"
+                                :title="isAttended('orders', {{ $navCounts['orders'] }}) ? 'Marked as attended ({{ $navCounts['orders'] }}). Click to mark as unread.' : '{{ $navCounts['orders'] }} pending items need attention! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('orders', {{ $navCounts['orders'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['orders'] }}</span>
+                                </span>
+                                <span x-show="isAttended('orders', {{ $navCounts['orders'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['orders'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
+                        @endif
                     </a>
-                    <a href="/admin/reports" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/reports') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+
+                    <a href="/admin/reports" @click="markAttended('reports', {{ $navCounts['reports'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/reports') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
                         <span class="flex items-center">
                             <svg class="w-4 h-4 mr-3 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                             Order Reports
                         </span>
-                        @php $pendingCountNav = \App\Models\OrderReport::where('status', 'pending')->count(); @endphp
-                        @if($pendingCountNav > 0)
-                            <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white">{{ $pendingCountNav }}</span>
+                        @if(($navCounts['reports'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('reports', {{ $navCounts['reports'] }})"
+                                :title="isAttended('reports', {{ $navCounts['reports'] }}) ? 'Marked as attended ({{ $navCounts['reports'] }}). Click to mark as unread.' : '{{ $navCounts['reports'] }} pending reports need attention! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('reports', {{ $navCounts['reports'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['reports'] }}</span>
+                                </span>
+                                <span x-show="isAttended('reports', {{ $navCounts['reports'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['reports'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
                         @endif
                     </a>
                 @endif
 
                 @if($can('users'))
-                    <a href="/admin/users" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/users') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                        Manage Users
+                    <a href="/admin/users" @click="markAttended('users', {{ $navCounts['users'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/users') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                            Manage Users
+                        </span>
+                        @if(($navCounts['users'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('users', {{ $navCounts['users'] }})"
+                                :title="isAttended('users', {{ $navCounts['users'] }}) ? 'Marked as attended ({{ $navCounts['users'] }}). Click to mark as unread.' : '{{ $navCounts['users'] }} pending users need verification! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('users', {{ $navCounts['users'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['users'] }}</span>
+                                </span>
+                                <span x-show="isAttended('users', {{ $navCounts['users'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['users'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
+                        @endif
                     </a>
                 @endif
 
@@ -91,29 +195,143 @@
                 @endif
 
                 @if($can('boosting'))
-                    <a href="/admin/boosting" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/boosting') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                        Boosting
+                    <a href="/admin/boosting" @click="markAttended('boosting', {{ $navCounts['boosting'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/boosting') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            Boosting
+                        </span>
+                        @if(($navCounts['boosting'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('boosting', {{ $navCounts['boosting'] }})"
+                                :title="isAttended('boosting', {{ $navCounts['boosting'] }}) ? 'Marked as attended ({{ $navCounts['boosting'] }}). Click to mark as unread.' : '{{ $navCounts['boosting'] }} pending boosts need processing! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('boosting', {{ $navCounts['boosting'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['boosting'] }}</span>
+                                </span>
+                                <span x-show="isAttended('boosting', {{ $navCounts['boosting'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['boosting'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
+                        @endif
                     </a>
                 @endif
 
                 @if($can('funding'))
-                    <a href="/admin/funding" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/funding') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Funding
+                    <a href="/admin/funding" @click="markAttended('funding', {{ $navCounts['funding'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/funding') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Funding
+                        </span>
+                        @if(($navCounts['funding'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('funding', {{ $navCounts['funding'] }})"
+                                :title="isAttended('funding', {{ $navCounts['funding'] }}) ? 'Marked as attended ({{ $navCounts['funding'] }}). Click to mark as unread.' : '{{ $navCounts['funding'] }} pending deposits need approval! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('funding', {{ $navCounts['funding'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['funding'] }}</span>
+                                </span>
+                                <span x-show="isAttended('funding', {{ $navCounts['funding'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['funding'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
+                        @endif
                     </a>
+
+                    <a href="/admin/charges" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/charges') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <svg class="w-4 h-4 mr-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"></path></svg>
+                        Funding Charges
+                    </a>
+
+                    <!-- Save Small Small Admin Section -->
+                    <div class="space-y-1">
+                        <a href="/admin/savings" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ ($isActive('admin/savings') && !request()->is('admin/savings/categories*') && !request()->is('admin/savings/reconciliation*')) ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                            <span class="flex items-center">
+                                <span class="text-base mr-3">💰</span>
+                                Save Small Small
+                            </span>
+                            <span class="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase bg-[#facc15] text-gray-950">16.9%</span>
+                        </a>
+
+                        @if(request()->is('admin/savings*'))
+                            <div class="pl-9 pr-2 py-1.5 space-y-1 bg-gray-950/60 rounded-xl border border-gray-800/80 my-1">
+                                <a href="/admin/savings" class="block py-1 text-[11px] font-bold transition {{ (request()->is('admin/savings') && !request()->is('admin/savings/categories*') && !request()->is('admin/savings/reconciliation*')) ? 'text-teal-400 font-black' : 'text-gray-400 hover:text-white' }}">
+                                    • Customer Plans
+                                </a>
+                                <a href="/admin/savings/categories" class="block py-1 text-[11px] font-bold transition {{ request()->is('admin/savings/categories*') ? 'text-teal-400 font-black' : 'text-gray-400 hover:text-white' }}">
+                                    • Categories &amp; Interest
+                                </a>
+                                <a href="/admin/savings/reconciliation" class="block py-1 text-[11px] font-bold transition {{ request()->is('admin/savings/reconciliation*') ? 'text-teal-400 font-black' : 'text-gray-400 hover:text-white' }}">
+                                    • Reserves Reconciliation
+                                </a>
+                            </div>
+                        @endif
+                    </div>
                 @endif
 
                 @if($can('tickets'))
-                    <a href="/admin/tickets" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/tickets') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                        <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                        Support Tickets
+                    <a href="/admin/tickets" @click="markAttended('tickets', {{ $navCounts['tickets'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/tickets') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Support Tickets
+                        </span>
+                        @if(($navCounts['tickets'] ?? 0) > 0)
+                            <span 
+                                @click.stop.prevent="toggleAttended('tickets', {{ $navCounts['tickets'] }})"
+                                :title="isAttended('tickets', {{ $navCounts['tickets'] }}) ? 'Marked as attended ({{ $navCounts['tickets'] }}). Click to mark as unread.' : '{{ $navCounts['tickets'] }} open support tickets! Click to mark attended.'"
+                                class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                                <span x-show="!isAttended('tickets', {{ $navCounts['tickets'] }})" 
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                    <span>{{ $navCounts['tickets'] }}</span>
+                                </span>
+                                <span x-show="isAttended('tickets', {{ $navCounts['tickets'] }})" 
+                                      style="display: none;"
+                                      class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                    <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                    <span>{{ $navCounts['tickets'] }}</span>
+                                    <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                                </span>
+                            </span>
+                        @endif
                     </a>
                 @endif
 
-                <a href="/admin/reviews" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/reviews') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                    <svg class="w-4 h-4 mr-3 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
-                    User Reviews
+                <a href="/admin/reviews" @click="markAttended('reviews', {{ $navCounts['reviews'] }})" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/reviews') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-3 text-amber-400" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
+                        User Reviews
+                    </span>
+                    @if(($navCounts['reviews'] ?? 0) > 0)
+                        <span 
+                            @click.stop.prevent="toggleAttended('reviews', {{ $navCounts['reviews'] }})"
+                            :title="isAttended('reviews', {{ $navCounts['reviews'] }}) ? 'Marked as attended ({{ $navCounts['reviews'] }}). Click to mark as unread.' : '{{ $navCounts['reviews'] }} unapproved reviews! Click to mark attended.'"
+                            class="inline-flex items-center cursor-pointer select-none transition-transform hover:scale-105">
+                            <span x-show="!isAttended('reviews', {{ $navCounts['reviews'] }})" 
+                                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-600 text-white shadow-sm shadow-rose-900/50 animate-pulse">
+                                <span class="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
+                                <span>{{ $navCounts['reviews'] }}</span>
+                            </span>
+                            <span x-show="isAttended('reviews', {{ $navCounts['reviews'] }})" 
+                                  style="display: none;"
+                                  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-sm">
+                                <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+                                <span>{{ $navCounts['reviews'] }}</span>
+                                <span class="text-[9px] font-bold uppercase tracking-wider opacity-85">Attended</span>
+                            </span>
+                        </span>
+                    @endif
                 </a>
 
                 @if($can('settings'))
@@ -157,9 +375,17 @@
             </div>
 
             <div class="flex items-center space-x-4">
-                <a href="/admin/orders" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 text-[#0d9488] hover:bg-teal-100 font-extrabold text-xs transition">
+                <a href="/admin/orders" @click="markAttended('orders', {{ $navCounts['orders'] }})" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 text-[#0d9488] hover:bg-teal-100 font-extrabold text-xs transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z"></path></svg>
                     Orders & Refunds
+                    @if(($navCounts['orders'] ?? 0) > 0)
+                        <span x-show="!isAttended('orders', {{ $navCounts['orders'] }})" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-600 text-white animate-pulse">
+                            {{ $navCounts['orders'] }}
+                        </span>
+                        <span x-show="isAttended('orders', {{ $navCounts['orders'] }})" style="display: none;" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-600 text-white">
+                            ✓
+                        </span>
+                    @endif
                 </a>
                 <div class="flex items-center gap-2 pl-3 border-l border-gray-200">
                     <div class="w-8 h-8 rounded-full bg-gray-900 text-white font-black text-xs flex items-center justify-center">

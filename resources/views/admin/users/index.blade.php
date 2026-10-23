@@ -143,7 +143,7 @@
     </div>
 </details>
 
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" x-data="bulkUsersManager()">
     <div class="px-6 py-5 border-b border-gray-100 bg-gray-50/80 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h3 class="text-lg font-black text-gray-900">Registered Users</h3>
         <form method="GET" action="/admin/users" class="flex flex-col sm:flex-row gap-2 sm:items-center">
@@ -158,10 +158,36 @@
         </form>
     </div>
 
+    <!-- Bulk Actions Floating Strip -->
+    <div x-show="selectedIds.length > 0" x-cloak x-transition class="bg-rose-50 border-b border-rose-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-rose-600 text-white text-xs font-black">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+            </span>
+            <span class="text-xs font-black text-rose-900">
+                <span x-text="selectedIds.length"></span> user(s) selected
+            </span>
+            <span class="text-xs text-rose-600 hidden sm:inline">• Choose an action below</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <button type="button" @click="selectedIds = []" class="px-3 py-1.5 text-xs font-bold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl transition cursor-pointer">
+                Deselect All
+            </button>
+            <button type="button" @click="showBulkModal = true" class="px-4 py-1.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-sm transition flex items-center gap-1.5 cursor-pointer">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                <span>Bulk Delete (<span x-text="selectedIds.length"></span>)</span>
+            </button>
+        </div>
+    </div>
+
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50">
                 <tr>
+                    <th class="w-12 px-4 py-3.5 text-center">
+                        <input type="checkbox" @change="toggleSelectAll($event)" :checked="isAllSelected" class="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500 cursor-pointer" title="Select all on this page">
+                    </th>
                     <th class="px-6 py-3.5 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">User</th>
                     <th class="px-6 py-3.5 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">Roles</th>
                     <th class="px-6 py-3.5 text-left text-xs font-extrabold text-gray-500 uppercase tracking-wider">Status</th>
@@ -176,8 +202,17 @@
                     @php
                         $st = (string) ($u->account_status ?? '');
                         $badge = $st === 'active' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : ($st === 'blocked' ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200');
+                        $isSelf = ((int) auth()->id() === (int) $u->id);
+                        $isPrimaryAdmin = ((int) $u->id === 1 && (int) auth()->id() !== 1);
                     @endphp
-                    <tr class="hover:bg-gray-50/50 transition">
+                    <tr class="hover:bg-gray-50/50 transition" :class="{ 'bg-rose-50/40': selectedIds.includes('{{ $u->id }}') || selectedIds.includes({{ $u->id }}) }">
+                        <td class="w-12 px-4 py-4 text-center">
+                            @if(!$isSelf && !$isPrimaryAdmin)
+                                <input type="checkbox" value="{{ $u->id }}" x-model="selectedIds" class="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500 cursor-pointer">
+                            @else
+                                <span class="text-gray-300 text-xs" title="Protected account">—</span>
+                            @endif
+                        </td>
                         <td class="px-6 py-4 text-sm text-gray-900">
                             <div class="flex items-center gap-3">
                                 <div class="w-9 h-9 rounded-full bg-gray-900 text-white font-black text-xs flex items-center justify-center shrink-0">
@@ -206,7 +241,7 @@
                                 @endif
                             </div>
                         </td>
-                        <td class="px-6 py-4 text-sm">
+                        <td class="px-6 py-4 text-sm whitespace-nowrap">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full border text-xs font-black {{ $badge }}">{{ strtoupper($st ?: 'UNKNOWN') }}</span>
                         </td>
                         <td class="px-6 py-4 text-sm font-black text-gray-900 whitespace-nowrap">
@@ -220,16 +255,23 @@
                             <div class="text-[10px] text-gray-400 font-medium">{{ $u->last_login_ip ?? '—' }}</div>
                         </td>
                         <td class="px-6 py-4 text-right whitespace-nowrap">
-                            <a href="/admin/users/{{ $u->id }}" class="inline-flex items-center gap-1 bg-[#0d9488] hover:bg-[#0f766e] text-white px-3 py-1.5 rounded-xl text-xs font-extrabold transition shadow-sm">
-                                Manage Profile
-                            </a>
+                            <div class="inline-flex items-center gap-1.5">
+                                <a href="/admin/users/{{ $u->id }}" class="inline-flex items-center gap-1 bg-[#0d9488] hover:bg-[#0f766e] text-white px-3 py-1.5 rounded-xl text-xs font-extrabold transition shadow-sm">
+                                    Profile
+                                </a>
+                                @if(!$isSelf && !$isPrimaryAdmin)
+                                    <button type="button" @click="confirmSingleDelete({{ $u->id }}, '{{ addslashes($u->name) }}')" class="inline-flex items-center justify-center h-8 w-8 text-rose-500 hover:text-white hover:bg-rose-600 rounded-xl transition border border-rose-200 hover:border-rose-600 cursor-pointer" title="Delete User">
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                    </button>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                 @endforeach
 
                 @if($users->isEmpty())
                     <tr>
-                        <td colspan="7" class="px-6 py-10 text-center text-gray-500 font-bold">No users found matching your query.</td>
+                        <td colspan="8" class="px-6 py-10 text-center text-gray-500 font-bold">No users found matching your query.</td>
                     </tr>
                 @endif
             </tbody>
@@ -239,5 +281,123 @@
     <div class="px-6 py-5 border-t border-gray-100 bg-gray-50">
         {{ $users->onEachSide(1)->links() }}
     </div>
+
+    <!-- Bulk Delete Confirmation Modal -->
+    <div x-show="showBulkModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showBulkModal = false"></div>
+        <div class="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 z-10 overflow-hidden">
+            <div class="flex items-center gap-3 text-rose-600 mb-4">
+                <div class="h-11 w-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl shrink-0">
+                    <svg class="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-gray-900">Confirm Bulk Delete</h3>
+                    <p class="text-xs text-rose-600 font-bold">Irreversible operation</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-600 leading-relaxed mb-4">
+                Are you sure you want to permanently delete the <strong class="text-gray-900" x-text="selectedIds.length"></strong> selected user account(s)?
+            </p>
+
+            <div class="bg-rose-50/70 border border-rose-100 rounded-2xl p-3.5 mb-6 text-xs text-rose-800 leading-normal">
+                <strong>Warning:</strong> All orders, SMS records, wallet transactions, tickets, and associated logs for these users will be permanently erased.
+            </div>
+
+            <form action="/admin/users/bulk-delete" method="POST">
+                @csrf
+                <template x-for="id in selectedIds" :key="id">
+                    <input type="hidden" name="user_ids[]" :value="id">
+                </template>
+
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" @click="showBulkModal = false" class="px-5 py-2.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>Yes, Delete Selected</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Single Delete Confirmation Modal -->
+    <div x-show="showSingleModal" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-gray-900/60 backdrop-blur-sm" @click="showSingleModal = false"></div>
+        <div class="relative bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 z-10 overflow-hidden">
+            <div class="flex items-center gap-3 text-rose-600 mb-4">
+                <div class="h-11 w-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-xl shrink-0">
+                    <svg class="w-6 h-6 text-rose-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-gray-900">Delete User Account</h3>
+                    <p class="text-xs text-rose-600 font-bold" x-text="singleDeleteName"></p>
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-600 leading-relaxed mb-4">
+                Are you sure you want to permanently delete user <strong class="text-gray-900" x-text="singleDeleteName"></strong> (ID #<span x-text="singleDeleteId"></span>)?
+            </p>
+
+            <div class="bg-rose-50/70 border border-rose-100 rounded-2xl p-3.5 mb-6 text-xs text-rose-800 leading-normal">
+                <strong>Warning:</strong> All orders, SMS records, wallet transactions, tickets, and associated logs for this user will be permanently deleted.
+            </div>
+
+            <form :action="'/admin/users/' + singleDeleteId + '/delete'" method="POST">
+                @csrf
+                <div class="flex items-center justify-end gap-3">
+                    <button type="button" @click="showSingleModal = false" class="px-5 py-2.5 text-xs font-bold text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="px-5 py-2.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        <span>Yes, Delete User</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    function bulkUsersManager() {
+        return {
+            selectedIds: [],
+            pageIds: @json($users->pluck('id')),
+            showBulkModal: false,
+            showSingleModal: false,
+            singleDeleteId: null,
+            singleDeleteName: '',
+
+            get isAllSelected() {
+                const currentAdminId = {{ (int) auth()->id() }};
+                const eligiblePageIds = this.pageIds.filter(id => id !== currentAdminId && ({{ (int) auth()->id() }} === 1 || id !== 1));
+                if (eligiblePageIds.length === 0) return false;
+                return eligiblePageIds.every(id => this.selectedIds.includes(String(id)) || this.selectedIds.includes(Number(id)));
+            },
+
+            toggleSelectAll(event) {
+                const currentAdminId = {{ (int) auth()->id() }};
+                const eligiblePageIds = this.pageIds.filter(id => id !== currentAdminId && ({{ (int) auth()->id() }} === 1 || id !== 1));
+
+                if (event.target.checked) {
+                    const currentSet = new Set(this.selectedIds.map(String));
+                    eligiblePageIds.forEach(id => currentSet.add(String(id)));
+                    this.selectedIds = Array.from(currentSet);
+                } else {
+                    const removeSet = new Set(eligiblePageIds.map(String));
+                    this.selectedIds = this.selectedIds.filter(id => !removeSet.has(String(id)));
+                }
+            },
+
+            confirmSingleDelete(id, name) {
+                this.singleDeleteId = id;
+                this.singleDeleteName = name;
+                this.showSingleModal = true;
+            }
+        };
+    }
+</script>
 @endsection

@@ -82,6 +82,8 @@ return [
     'daisysms' => [
         'api_key' => env('DAISYSMS_API_KEY'),
         'base_url' => env('DAISYSMS_BASE_URL', 'https://daisysms.io/stubs/handler_api.php'),
+        'proxy' => env('DAISYSMS_PROXY'),
+        'flaresolverr_url' => env('DAISYSMS_FLARESOLVERR_URL'),
     ],
 
     'herosms' => [
@@ -93,4 +95,11 @@ return [
         'api_key' => env('FIVESIM_API_KEY'),
     ],
 
+    'monietude' => [
+        'api_key' => env('MONIETUDE_API_KEY', 'mk_ngWDCRXg4OLw7WwT9bP4GLHqvolcH7GlW8f69Sb09cprHmeh'),
+        'api_url' => env('MONIETUDE_API_URL', 'https://monietude.com/api/gateway'),
+        'provider' => env('MONIETUDE_PROVIDER', 'palmpay'),
+    ],
+
 ];
+

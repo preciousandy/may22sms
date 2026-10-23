@@ -8,6 +8,7 @@ use App\Models\FundingTransaction;
 use App\Models\Setting;
 use App\Models\SystemTransaction;
 use App\Notifications\SimpleDatabaseNotification;
+use App\Services\MonietudeService;
 use App\Services\NowPaymentsService;
 use App\Services\PaymentPointService;
 use App\Services\PocketFiService;
@@ -27,17 +28,21 @@ class FundingController extends Controller
         $paymentpointEnabled = (int) (Setting::where('key', 'payment_method_paymentpoint_enabled')->value('value') ?? 1) === 1;
         $strollwalletEnabled = (int) (Setting::where('key', 'payment_method_strollwallet_enabled')->value('value') ?? 1) === 1;
         $pocketfiEnabled = (int) (Setting::where('key', 'payment_method_pocketfi_enabled')->value('value') ?? 1) === 1;
+        $monietudeEnabled = (int) (Setting::where('key', 'payment_method_monietude_enabled')->value('value') ?? 1) === 1;
         $cryptoEnabled = (int) (Setting::where('key', 'payment_method_crypto_enabled')->value('value') ?? 1) === 1;
 
         $methods = [];
+        if ($monietudeEnabled) {
+            $methods[] = 'monietude';
+        }
         if ($paymentpointEnabled) {
             $methods[] = 'paymentpoint';
         }
-        if ($strollwalletEnabled) {
-            $methods[] = 'strollwallet';
-        }
         if ($pocketfiEnabled) {
             $methods[] = 'pocketfi';
+        }
+        if ($strollwalletEnabled) {
+            $methods[] = 'strollwallet';
         }
         if ($cryptoEnabled) {
             $methods[] = 'crypto';
@@ -79,14 +84,13 @@ class FundingController extends Controller
                         if ($lockedTx && $lockedTx->status !== 'approved') {
                             $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
                             $amount = (float) ($data['amount'] ?? $data['amount_paid'] ?? $data['totalPaymentAmount'] ?? $lockedTx->amount);
-                            if ($amount > 0 && ($lockedTx->amount === 0.0 || $lockedTx->amount_usd === 0.0)) {
-                                $amountUsd = $ngnPerUsd > 0 ? ($amount / $ngnPerUsd) : 0;
-                                if ($amountUsd > 0) {
-                                    $lockedTx->amount = round($amount, 2);
-                                    $lockedTx->amount_usd = round($amountUsd, 2);
-                                    $lockedTx->currency = 'NGN';
-                                    $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
-                                }
+                            if ($amount > 0) {
+                                $calc = FundingTransaction::calculateNetAndFee($amount, (string) ($lockedTx->payment_method ?: 'pocketfi'), $ngnPerUsd);
+                                $lockedTx->amount = round($amount, 2);
+                                $lockedTx->amount_usd = $calc['net_usd'];
+                                $lockedTx->currency = 'NGN';
+                                $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
+                                $lockedTx->save();
                             }
                             $user = $lockedTx->user()->lockForUpdate()->first();
                             $wallet->credit($user, (float) $lockedTx->amount_usd, 'funding_credit', (string) $lockedTx->reference, [
@@ -94,6 +98,8 @@ class FundingController extends Controller
                                 'payment_method' => (string) $lockedTx->payment_method,
                                 'provider' => 'pocketfi',
                                 'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                                'gross_ngn' => $amount,
+                                'charge_percent' => FundingTransaction::getChargePercent((string) ($lockedTx->payment_method ?: 'pocketfi')),
                             ]);
                             $lockedTx->status = 'approved';
                             $lockedTx->approved_at = now();
@@ -136,7 +142,7 @@ class FundingController extends Controller
         $currency = session('currency', (string) (Setting::where('key', 'default_currency')->value('value') ?? 'USD'));
 
         $enabledFundingMethods = $this->enabledFundingMethods();
-        $defaultFundingMethod = $enabledFundingMethods[0] ?? 'paymentpoint';
+        $defaultFundingMethod = $enabledFundingMethods[0] ?? 'monietude';
 
         $user = auth()->user();
         $userVirtualAccounts = [];
@@ -152,6 +158,42 @@ class FundingController extends Controller
                 'account_number' => $user->strollwallet_account_number,
                 'bank_name' => $user->strollwallet_bank_name,
                 'account_name' => $user->strollwallet_account_name,
+            ];
+        }
+
+        $monietudeService = app(MonietudeService::class);
+        if (in_array('monietude', $enabledFundingMethods, true) && ! $user->monietude_account_number && $monietudeService->isConfigured()) {
+            try {
+                $phone = $monietudeService->formatPhone($user->phone_number, $user->id);
+                $provider = config('services.monietude.provider', 'palmpay');
+                $result = $monietudeService->createVirtualAccount([
+                    'name' => $user->name ?: ('User ' . $user->id),
+                    'phone' => $phone,
+                    'email' => $user->email,
+                    'provider' => $provider,
+                ]);
+
+                if ($result['ok'] ?? false) {
+                    $vaData = $result['data']['data'] ?? $result['data'] ?? [];
+                    if (! empty($vaData['account_number'])) {
+                        $user->monietude_account_number = $vaData['account_number'];
+                        $user->monietude_bank_name = $vaData['bank_name'] ?? 'PalmPay';
+                        $user->monietude_account_name = $vaData['account_name'] ?? $user->name;
+                        $user->monietude_provider = $vaData['provider'] ?? $provider;
+                        $user->save();
+                    }
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Auto-generate Monietude virtual account error: ' . $e->getMessage());
+            }
+        }
+
+        if ($user->monietude_account_number) {
+            $userVirtualAccounts['monietude'] = [
+                'account_number' => $user->monietude_account_number,
+                'bank_name' => $user->monietude_bank_name ?: 'PalmPay',
+                'account_name' => $user->monietude_account_name,
+                'provider' => $user->monietude_provider ?: 'palmpay',
             ];
         }
 
@@ -233,13 +275,15 @@ class FundingController extends Controller
                     ->withInput();
             }
 
+            $calc = FundingTransaction::calculateNetAndFee($currency === 'NGN' ? $amount : $amount * $ngnPerUsd, (string) $request->payment_method, $ngnPerUsd);
+
             $tx = FundingTransaction::create([
                 'user_id' => auth()->id(),
                 'promo_code_id' => null,
                 'payment_method' => $request->payment_method,
                 'currency' => $currency,
                 'amount' => round($amount, 2),
-                'amount_usd' => round($amountUsdExact, 2),
+                'amount_usd' => $calc['net_usd'],
                 'rate_ngn_per_usd' => $currency === 'NGN' ? $ngnPerUsd : null,
                 'reference' => $reference,
                 'status' => 'pending',
@@ -274,7 +318,10 @@ class FundingController extends Controller
             $tx->status = 'initiated';
             $tx->save();
 
-            $appUrl = rtrim((string) config('app.url'), '/');
+            $appUrl = rtrim((string) (request()->root() ?: 'https://may22sim.com'), '/');
+            if (str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost')) {
+                $appUrl = 'https://may22sim.com';
+            }
             $isLocalUrl = str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost');
 
             $invoicePayload = [
@@ -362,13 +409,15 @@ class FundingController extends Controller
                 return back()->with('error', 'PocketFi is not configured yet.')->withInput();
             }
 
+            $calc = FundingTransaction::calculateNetAndFee($currency === 'NGN' ? $amount : $amount * $ngnPerUsd, $method, $ngnPerUsd);
+
             $tx = FundingTransaction::create([
                 'user_id' => auth()->id(),
                 'promo_code_id' => null,
                 'payment_method' => $method,
                 'currency' => $currency,
                 'amount' => round($amount, 2),
-                'amount_usd' => round($amountUsdExact, 2),
+                'amount_usd' => $calc['net_usd'],
                 'rate_ngn_per_usd' => $currency === 'NGN' ? $ngnPerUsd : null,
                 'reference' => $reference,
                 'status' => 'pending',
@@ -391,12 +440,17 @@ class FundingController extends Controller
                 ],
             ]);
 
-            $appUrl = rtrim((string) config('app.url'), '/');
+            $appUrl = rtrim((string) (request()->root() ?: 'https://may22sim.com'), '/');
+            if (str_contains($appUrl, '127.0.0.1') || str_contains($appUrl, 'localhost')) {
+                $appUrl = 'https://may22sim.com';
+            }
             $user = auth()->user();
 
             $fullNameParts = explode(' ', $user->name, 2);
             $firstName = trim($fullNameParts[0] ?? 'User');
             $lastName = trim($fullNameParts[1] ?? 'User');
+
+            $redirectUrl = trim($appUrl.'/funding/pocketfi/callback');
 
             $checkoutPayload = [
                 'first_name' => $firstName,
@@ -405,7 +459,8 @@ class FundingController extends Controller
                 'business_id' => config('services.pocketfi.business_id'),
                 'email' => trim($user->email),
                 'reference' => $reference,
-                'redirect_link' => trim($appUrl.'/funding/pocketfi/callback'),
+                'redirect_link' => $redirectUrl,
+                'redirect_url' => $redirectUrl,
                 'webhook_url' => trim($appUrl.'/api/pocketfi/webhook'),
                 'callback_url' => trim($appUrl.'/api/pocketfi/webhook'),
                 'amount' => (string) ($currency === 'NGN' ? $amount : $amount * $ngnPerUsd),
@@ -450,6 +505,108 @@ class FundingController extends Controller
             $tx->save();
 
             return redirect()->away($tx->payment_url);
+        }
+
+        if ($method === 'monietude') {
+            if (is_null($request->amount)) {
+                return back()->with('error', 'Amount is required.')->withInput();
+            }
+            $amount = (float) $request->amount;
+
+            if ($currency === 'NGN') {
+                $amountUsd = $ngnPerUsd > 0 ? ($amount / $ngnPerUsd) : 0;
+            } else {
+                $amountUsd = $amount;
+            }
+
+            $minUsd = 0.06;
+            $minNgn = 0.06 * $ngnPerUsd;
+
+            $belowMinimum = $currency === 'NGN' ? ($amount < $minNgn) : ($amountUsd < $minUsd);
+            if ($belowMinimum) {
+                if ($currency === 'NGN') {
+                    return back()
+                        ->with('error', 'Minimum deposit is ₦'.number_format($minNgn, 2).' (≈ $'.number_format($minUsd, 2).')')
+                        ->withInput();
+                }
+
+                return back()
+                    ->with('error', 'Minimum deposit is $'.number_format($minUsd, 2).' (≈ ₦'.number_format($minNgn, 2).')')
+                    ->withInput();
+            }
+
+            $service = app(MonietudeService::class);
+            if (! $service->isConfigured()) {
+                return back()->with('error', 'Monietude is not configured yet.')->withInput();
+            }
+
+            $user = auth()->user();
+            if (! $user->monietude_account_number) {
+                $phone = $service->formatPhone($user->phone_number, $user->id);
+                $provider = config('services.monietude.provider', 'palmpay');
+                $result = $service->createVirtualAccount([
+                    'name' => $user->name ?: ('User ' . $user->id),
+                    'phone' => $phone,
+                    'email' => $user->email,
+                    'provider' => $provider,
+                ]);
+
+                if (! ($result['ok'] ?? false)) {
+                    $msg = $result['data']['message'] ?? 'Failed to create Monietude virtual account.';
+                    return back()->with('error', $msg)->withInput();
+                }
+
+                $vaData = $result['data']['data'] ?? $result['data'] ?? [];
+                $user->monietude_account_number = $vaData['account_number'] ?? null;
+                $user->monietude_bank_name = $vaData['bank_name'] ?? 'PalmPay';
+                $user->monietude_account_name = $vaData['account_name'] ?? $user->name;
+                $user->monietude_provider = $vaData['provider'] ?? $provider;
+                $user->save();
+            }
+
+            $calc = FundingTransaction::calculateNetAndFee($currency === 'NGN' ? $amount : $amount * $ngnPerUsd, 'monietude', $ngnPerUsd);
+            $reference = 'MN-' . strtoupper(Str::random(10));
+
+            $tx = FundingTransaction::create([
+                'user_id' => $user->id,
+                'promo_code_id' => null,
+                'payment_method' => 'monietude',
+                'provider' => 'monietude',
+                'provider_payment_id' => $user->monietude_account_number,
+                'currency' => $currency,
+                'amount' => round($amount, 2),
+                'amount_usd' => $calc['net_usd'],
+                'rate_ngn_per_usd' => $currency === 'NGN' ? $ngnPerUsd : null,
+                'reference' => $reference,
+                'status' => 'waiting_payment',
+            ]);
+
+            SystemTransaction::create([
+                'actor_user_id' => $user->id,
+                'user_id' => $user->id,
+                'type' => 'funding',
+                'action' => 'create',
+                'status' => (string) $tx->status,
+                'subject_type' => FundingTransaction::class,
+                'subject_id' => (string) $tx->id,
+                'amount_usd' => (float) $tx->amount_usd,
+                'reference' => (string) $tx->reference,
+                'meta' => [
+                    'payment_method' => 'monietude',
+                    'currency' => (string) $tx->currency,
+                    'amount' => (float) $tx->amount,
+                ],
+            ]);
+
+            return redirect()->route('funding')->with('virtual_account', [
+                'method' => 'monietude',
+                'bank_name' => $user->monietude_bank_name ?: 'PalmPay',
+                'account_name' => $user->monietude_account_name,
+                'account_number' => $user->monietude_account_number,
+                'amount' => $amount,
+                'currency' => $currency,
+                'reference' => $tx->reference,
+            ]);
         }
 
         if ($method === 'paymentpoint' || $method === 'strollwallet') {
@@ -552,13 +709,15 @@ class FundingController extends Controller
             }
 
             if (is_null($tx)) {
+                $calc = FundingTransaction::calculateNetAndFee($currency === 'NGN' ? $amount : $amount * $ngnPerUsd, $method, $ngnPerUsd);
+
                 $tx = FundingTransaction::create([
                     'user_id' => auth()->id(),
                     'promo_code_id' => null,
                     'payment_method' => $method,
                     'currency' => $currency,
                     'amount' => round($amount, 2),
-                    'amount_usd' => round($amountUsdExact, 2),
+                    'amount_usd' => $calc['net_usd'],
                     'rate_ngn_per_usd' => $currency === 'NGN' ? $ngnPerUsd : null,
                     'reference' => $reference,
                     'status' => 'pending',
@@ -864,28 +1023,47 @@ class FundingController extends Controller
 
     public function pocketfiCallback(Request $request, PocketFiService $pocketfi, WalletService $wallet, ReferralService $referrals)
     {
-        $paymentId = $request->query('payment_id');
+        $paymentId  = $request->query('payment_id');
+        $reference  = $request->query('reference') ?? $request->query('tx_ref') ?? $request->query('trxref');
 
-        if (! $paymentId && auth()->check()) {
+        // Try to find transaction by payment_id first, then by reference
+        $tx = null;
+        if ($paymentId) {
+            $tx = FundingTransaction::where('provider_payment_id', (string) $paymentId)->first();
+        }
+        if (! $tx && $reference) {
+            $tx = FundingTransaction::where('reference', (string) $reference)
+                ->where('payment_method', 'pocketfi')
+                ->first();
+            // If found by reference, grab the stored payment_id
+            if ($tx && $tx->provider_payment_id) {
+                $paymentId = $tx->provider_payment_id;
+            }
+        }
+
+        // Last fallback: if logged in, find their latest pending pocketfi tx
+        if (! $tx && ! $paymentId && auth()->check()) {
             $tx = FundingTransaction::where('user_id', auth()->id())
-                ->where('status', 'waiting_payment')
+                ->whereIn('status', ['waiting_payment', 'initiated', 'pending'])
                 ->where('payment_method', 'pocketfi')
                 ->latest()
                 ->first();
-            if ($tx) {
+            if ($tx && $tx->provider_payment_id) {
                 $paymentId = $tx->provider_payment_id;
             }
         }
 
         if (! $paymentId) {
             if (auth()->check()) {
-                return redirect('/funding')->with('error', 'PocketFi callback received without a payment_id.');
+                return redirect('/funding')->with('error', 'PocketFi callback received without a payment reference. Please check your funding history or contact support.');
             }
-            return redirect('/login')->with('error', 'PocketFi callback received without a payment_id. Please log in and check your funding history.');
+            return redirect('/login')->with('error', 'PocketFi payment received. Please log in and check your funding history.');
         }
 
-        $tx = FundingTransaction::where('provider_payment_id', (string) $paymentId)
-            ->first();
+        if (! $tx) {
+            $tx = FundingTransaction::where('provider_payment_id', (string) $paymentId)->first();
+        }
+
 
         if (! $tx) {
             if (auth()->check()) {
@@ -947,14 +1125,13 @@ class FundingController extends Controller
             if ($amount === 0.0) {
                 $amount = (float) ($data['amount_paid'] ?? $data['totalPaymentAmount'] ?? $lockedTx->amount);
             }
-            if ($amount > 0 && ($lockedTx->amount === 0.0 || $lockedTx->amount_usd === 0.0)) {
-                $amountUsd = $ngnPerUsd > 0 ? ($amount / $ngnPerUsd) : 0;
-                if ($amountUsd > 0) {
-                    $lockedTx->amount = round($amount, 2);
-                    $lockedTx->amount_usd = round($amountUsd, 2);
-                    $lockedTx->currency = 'NGN';
-                    $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
-                }
+            if ($amount > 0) {
+                $calc = FundingTransaction::calculateNetAndFee($amount, (string) ($lockedTx->payment_method ?: 'pocketfi'), $ngnPerUsd);
+                $lockedTx->amount = round($amount, 2);
+                $lockedTx->amount_usd = $calc['net_usd'];
+                $lockedTx->currency = 'NGN';
+                $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
+                $lockedTx->save();
             }
 
             $user = $lockedTx->user()->lockForUpdate()->first();
@@ -963,6 +1140,8 @@ class FundingController extends Controller
                 'payment_method' => (string) $lockedTx->payment_method,
                 'provider' => 'pocketfi',
                 'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                'gross_ngn' => $amount,
+                'charge_percent' => FundingTransaction::getChargePercent((string) ($lockedTx->payment_method ?: 'pocketfi')),
             ]);
 
             $lockedTx->status = 'approved';
@@ -1056,14 +1235,13 @@ class FundingController extends Controller
                     }
                     $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
                     $amount = (float) ($data['amount'] ?? $data['amount_paid'] ?? $data['totalPaymentAmount'] ?? $lockedTx->amount);
-                    if ($amount > 0 && ($lockedTx->amount === 0.0 || $lockedTx->amount_usd === 0.0)) {
-                        $amountUsd = $ngnPerUsd > 0 ? ($amount / $ngnPerUsd) : 0;
-                        if ($amountUsd > 0) {
-                            $lockedTx->amount = round($amount, 2);
-                            $lockedTx->amount_usd = round($amountUsd, 2);
-                            $lockedTx->currency = 'NGN';
-                            $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
-                        }
+                    if ($amount > 0) {
+                        $calc = FundingTransaction::calculateNetAndFee($amount, (string) ($lockedTx->payment_method ?: 'pocketfi'), $ngnPerUsd);
+                        $lockedTx->amount = round($amount, 2);
+                        $lockedTx->amount_usd = $calc['net_usd'];
+                        $lockedTx->currency = 'NGN';
+                        $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
+                        $lockedTx->save();
                     }
                     $user = $lockedTx->user()->lockForUpdate()->first();
                     $wallet->credit($user, (float) $lockedTx->amount_usd, 'funding_credit', (string) $lockedTx->reference, [
@@ -1071,6 +1249,8 @@ class FundingController extends Controller
                         'payment_method' => (string) $lockedTx->payment_method,
                         'provider' => 'pocketfi',
                         'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                        'gross_ngn' => $amount,
+                        'charge_percent' => FundingTransaction::getChargePercent((string) ($lockedTx->payment_method ?: 'pocketfi')),
                     ]);
                     $lockedTx->status = 'approved';
                     $lockedTx->approved_at = now();

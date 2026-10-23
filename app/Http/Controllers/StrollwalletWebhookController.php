@@ -93,16 +93,15 @@ class StrollwalletWebhookController extends Controller
             }
 
             $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
-            $amountNgn = (float) ($data['amount'] ?? $data['amountNgn'] ?? $data['ngnAmount'] ?? 0);
+            $amountNgn = (float) ($data['amount_paid'] ?? $data['amount'] ?? $data['amountNgn'] ?? $data['ngnAmount'] ?? 0);
             if ($amountNgn === 0) {
                 $amountKobo = (float) ($data['amountKobo'] ?? $data['koboAmount'] ?? $data['kobo'] ?? 0);
                 $amountNgn = $amountKobo / 100;
             }
-            $amountUsd = $ngnPerUsd > 0 ? ($amountNgn / $ngnPerUsd) : 0;
-
-            if ($amountUsd > 0) {
+            if ($amountNgn > 0) {
+                $calc = FundingTransaction::calculateNetAndFee($amountNgn, 'strollwallet', $ngnPerUsd);
                 $lockedTx->amount = round($amountNgn, 2);
-                $lockedTx->amount_usd = round($amountUsd, 2);
+                $lockedTx->amount_usd = $calc['net_usd'];
                 $lockedTx->currency = 'NGN';
                 $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
                 $lockedTx->save();
@@ -114,6 +113,8 @@ class StrollwalletWebhookController extends Controller
                 'payment_method' => (string) $lockedTx->payment_method,
                 'provider' => 'strollwallet',
                 'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                'gross_ngn' => $amountNgn,
+                'charge_percent' => FundingTransaction::getChargePercent('strollwallet'),
             ]);
 
             $lockedTx->status = 'approved';

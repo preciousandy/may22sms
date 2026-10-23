@@ -45,9 +45,9 @@ class WalletService
                 'user_id' => $lockedUser->id,
                 'type' => $type,
                 'reference' => $reference,
-                'amount_usd' => round($amountUsd, 2),
-                'balance_before' => round($before, 2),
-                'balance_after' => round($after, 2),
+                'amount_usd' => round($amountUsd, 8),
+                'balance_before' => round($before, 8),
+                'balance_after' => round($after, 8),
                 'meta' => $meta ?: null,
             ]);
 
@@ -67,14 +67,14 @@ class WalletService
                 'status' => 'completed',
                 'subject_type' => WalletTransaction::class,
                 'subject_id' => (string) $tx->id,
-                'amount_usd' => round($amountUsd, 2),
+                'amount_usd' => round($amountUsd, 8),
                 'reference' => $reference,
                 'reversible' => $type === 'admin_adjustment',
                 'before' => [
-                    'walletBalance' => round($before, 2),
+                    'walletBalance' => round($before, 8),
                 ],
                 'after' => [
-                    'walletBalance' => round($after, 2),
+                    'walletBalance' => round($after, 8),
                 ],
                 'meta' => array_merge($meta, [
                     'wallet_transaction_id' => $tx->id,

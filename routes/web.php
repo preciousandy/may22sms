@@ -31,6 +31,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('home');
+})->name('home');
+
+Route::get('/home', function () {
+    return view('home');
 });
 
 Route::get('/api/football-matches', [\App\Http\Controllers\User\FootballMatchController::class, 'apiIndex']);
@@ -90,6 +94,10 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
 
     Route::post('/api/reviews', [\App\Http\Controllers\User\ReviewController::class, 'store']);
     Route::get('/api/reviews/check', [\App\Http\Controllers\User\ReviewController::class, 'checkStatus']);
+
+    // Daily Login Gift
+    Route::get('/api/daily-gift/status', [\App\Http\Controllers\User\DailyGiftController::class, 'status']);
+    Route::post('/api/daily-gift/claim', [\App\Http\Controllers\User\DailyGiftController::class, 'claim']);
 
     Route::get('/dashboard', function () {
         $user = auth()->user();
@@ -187,6 +195,8 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::post('/funding/{id}/cancel', [FundingController::class, 'cancel'])->name('funding.cancel');
     Route::post('/funding/{id}/check-status', [FundingController::class, 'checkStatus'])->name('funding.check-status');
 
+    Route::get('/wallet', [WalletController::class, 'index'])->name('wallet');
+
     Route::get('/profile', [ProfileController::class, 'edit']);
     Route::post('/profile', [ProfileController::class, 'update']);
 
@@ -213,11 +223,100 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
 
     Route::get('/sporty-bet-codes', [\App\Http\Controllers\User\SportyBetCodeController::class, 'index']);
     Route::post('/sporty-bet-codes/{code}/purchase', [\App\Http\Controllers\User\SportyBetCodeController::class, 'purchase']);
+
+    // Tutorials & How-To-Use Guides Center
+    Route::get('/tutorials', [\App\Http\Controllers\User\TutorialController::class, 'index'])->name('tutorials');
+    Route::get('/how-it-works', [\App\Http\Controllers\User\TutorialController::class, 'index'])->name('how-it-works');
+
+    // Save Small Small (Target & Goal Savings)
+    Route::get('/savings', [\App\Http\Controllers\User\SavingsController::class, 'index'])->name('savings.index');
+    Route::get('/savings/create', [\App\Http\Controllers\User\SavingsController::class, 'create'])->name('savings.create');
+    Route::post('/savings', [\App\Http\Controllers\User\SavingsController::class, 'store'])->name('savings.store');
+    Route::get('/savings/calculator', [\App\Http\Controllers\User\SavingsController::class, 'calculator'])->name('savings.calculator');
+    Route::get('/savings/{id}', [\App\Http\Controllers\User\SavingsController::class, 'show'])->name('savings.show');
+    Route::post('/savings/{id}/contribute', [\App\Http\Controllers\User\SavingsController::class, 'contribute'])->name('savings.contribute');
+    Route::post('/savings/{id}/break', [\App\Http\Controllers\User\SavingsController::class, 'breakPlan'])->name('savings.break');
+
+    // Upcoming Fintech & Utility Services (Coming Soon)
+    Route::get('/services/{service}', function (string $service) {
+        $allowed = [
+            'crypto-to-naira' => [
+                'title' => 'Receive Crypto & Convert to Naira',
+                'category' => 'Fintech & Web3',
+                'icon' => '🪙',
+                'badge' => 'NEW',
+                'desc' => 'Generate dedicated deposit addresses for USDT, BTC, and ETH. Instantly auto-swap to Nigerian Naira (NGN) deposited directly into your bank account or May22SMS wallet balance with zero delay.',
+                'features' => [
+                    'Zero Gas Fee Settlement on TRC20 & BEP20',
+                    'Competitive Real-Time P2P Rates',
+                    'Direct Bank Transfer to all Nigerian Commercial Banks & Fintechs',
+                    'Automated Multi-Coin Support (USDT, BTC, ETH, SOL)',
+                ],
+            ],
+            'airtime-data' => [
+                'title' => 'VTU Airtime & High-Speed Data',
+                'category' => 'Telecom Utilities',
+                'icon' => '📶',
+                'badge' => 'NEW',
+                'desc' => 'Instant VTU airtime recharge and discounted data bundles across MTN, Airtel, Glo, and 9mobile at up to 5% cashback discount.',
+                'features' => [
+                    'Instant Automated API Top-up in < 5 seconds',
+                    'MTN, Airtel, Glo & 9mobile Corporate Gifting & SME Data',
+                    'Cashback discounts on all airtime and bundle orders',
+                    'Auto-renew options for daily and monthly bundles',
+                ],
+            ],
+            'electricity' => [
+                'title' => 'Electricity Bills & Token Recharge',
+                'category' => 'Power & Utility Bills',
+                'icon' => '⚡',
+                'badge' => 'NEW',
+                'desc' => 'Instant prepaid electricity token generation and postpaid bill payment for all major DisCos across Nigeria.',
+                'features' => [
+                    'Instant Meter Token SMS & On-Screen Receipt',
+                    'Supports IKEDC, EKEDC, AEDC, IBEDC, PHED, EEDC, KEDCO, JED',
+                    'Zero Conveniency Fee with instant meter verification',
+                    'Saved meters for one-tap recharge anytime',
+                ],
+            ],
+            'betting' => [
+                'title' => 'Betting Account Funding & Top-Up',
+                'category' => 'Gaming & Wallets',
+                'icon' => '🎯',
+                'badge' => 'NEW',
+                'desc' => 'Fund your betting accounts instantly with zero processing fees. Top up SportyBet, Bet9ja, 1xBet, BetKing, MSport, Bangbet and more directly from your May22SMS wallet balance.',
+                'features' => [
+                    'Supports SportyBet, Bet9ja, 1xBet, BetKing, MSport, Bangbet & Merrybet',
+                    'Instant Customer ID & Name verification before payment',
+                    'Zero hidden transaction fees on all betting wallet deposits',
+                    'Save your Betting User ID for fast 1-tap re-funding anytime',
+                ],
+            ],
+        ];
+
+        if (! array_key_exists($service, $allowed)) {
+            abort(404);
+        }
+
+        $serviceData = $allowed[$service];
+        return view('user.coming-soon', compact('serviceData', 'service'));
+    })->name('services.coming-soon');
 });
 
 // Admin Protected Routes
 Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')->group(function () {
     Route::get('/dashboard', [DashboardController::class, 'index']);
+    
+    // Save Small Small Admin Management
+    Route::get('/savings', [\App\Http\Controllers\Admin\SavingsController::class, 'index'])->name('admin.savings.index');
+    Route::post('/savings/toggle-global-interest', [\App\Http\Controllers\Admin\SavingsController::class, 'toggleGlobalInterest'])->name('admin.savings.toggle-global-interest');
+    Route::get('/savings/categories', [\App\Http\Controllers\Admin\SavingsController::class, 'categories'])->name('admin.savings.categories');
+    Route::post('/savings/categories', [\App\Http\Controllers\Admin\SavingsController::class, 'storeCategory'])->name('admin.savings.categories.store');
+    Route::post('/savings/categories/{id}', [\App\Http\Controllers\Admin\SavingsController::class, 'updateCategory'])->name('admin.savings.categories.update');
+    Route::post('/savings/categories/{id}/toggle-interest', [\App\Http\Controllers\Admin\SavingsController::class, 'toggleCategoryInterest'])->name('admin.savings.categories.toggle-interest');
+    Route::get('/savings/reconciliation', [\App\Http\Controllers\Admin\SavingsController::class, 'reconciliation'])->name('admin.savings.reconciliation');
+    Route::get('/savings/{id}', [\App\Http\Controllers\Admin\SavingsController::class, 'show'])->name('admin.savings.show');
+
     Route::get('/reviews', [\App\Http\Controllers\Admin\ReviewController::class, 'index']);
     Route::delete('/reviews/{id}', [\App\Http\Controllers\Admin\ReviewController::class, 'destroy']);
     Route::get('/mail', [\App\Http\Controllers\Admin\MailController::class, 'index']);
@@ -233,10 +332,13 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
 
     Route::get('/users', [\App\Http\Controllers\Admin\UserController::class, 'index']);
     Route::post('/users/create', [\App\Http\Controllers\Admin\UserController::class, 'store']);
+    Route::post('/users/bulk-delete', [\App\Http\Controllers\Admin\UserController::class, 'bulkDestroy']);
     Route::get('/users/export/csv', [\App\Http\Controllers\Admin\UserController::class, 'exportCsv']);
     Route::get('/users/export/print', [\App\Http\Controllers\Admin\UserController::class, 'exportPrint']);
     Route::get('/users/{id}', [\App\Http\Controllers\Admin\UserController::class, 'show']);
     Route::post('/users/{id}', [\App\Http\Controllers\Admin\UserController::class, 'update']);
+    Route::delete('/users/{id}', [\App\Http\Controllers\Admin\UserController::class, 'destroy']);
+    Route::post('/users/{id}/delete', [\App\Http\Controllers\Admin\UserController::class, 'destroy']);
     Route::post('/users/{id}/password', [\App\Http\Controllers\Admin\UserController::class, 'resetPassword']);
     Route::post('/users/{id}/wallet-adjust', [\App\Http\Controllers\Admin\UserController::class, 'adjustWallet']);
     Route::post('/users/{id}/impersonate', [\App\Http\Controllers\Admin\UserController::class, 'impersonate']);
@@ -254,6 +356,9 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
 
     Route::get('/orders', [AdminOrdersController::class, 'index']);
     Route::post('/orders/refund', [AdminOrdersController::class, 'refundOrder']);
+    Route::post('/orders/cancel', [AdminOrdersController::class, 'cancelOrder']);
+    Route::post('/orders/approve-funding', [AdminOrdersController::class, 'approveFunding']);
+    Route::post('/orders/reverse-funding', [AdminOrdersController::class, 'reverseFunding']);
 
     Route::get('/reports', [\App\Http\Controllers\Admin\ReportController::class, 'index']);
     Route::post('/reports/{id}/action', [\App\Http\Controllers\Admin\ReportController::class, 'action']);
@@ -261,7 +366,18 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::get('/settings', [SettingsController::class, 'index']);
     Route::post('/settings', [SettingsController::class, 'update']);
     Route::post('/settings/maintenance', [SettingsController::class, 'maintenance']);
+    Route::get('/settings/storage-link', function () {
+        try {
+            \Illuminate\Support\Facades\Artisan::call('storage:link');
+            return redirect('/admin/settings')->with('success', 'Storage link created successfully!');
+        } catch (\Throwable $e) {
+            return redirect('/admin/settings')->with('error', 'Storage link error: ' . $e->getMessage());
+        }
+    });
     Route::post('/settings/sync-countries', [SettingsController::class, 'syncCountries']);
+
+    Route::get('/charges', [\App\Http\Controllers\Admin\ChargesController::class, 'index']);
+    Route::post('/charges', [\App\Http\Controllers\Admin\ChargesController::class, 'update']);
 
     // Admin Logs Management
     Route::get('/logs', [\App\Http\Controllers\Admin\LogController::class, 'index']);

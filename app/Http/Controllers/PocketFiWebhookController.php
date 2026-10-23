@@ -219,11 +219,10 @@ class PocketFiWebhookController extends Controller
             if ($amountNgn === 0.0) {
                 $amountNgn = (float) $lockedTx->amount;
             }
-            $amountUsd = $ngnPerUsd > 0 ? ($amountNgn / $ngnPerUsd) : 0;
-
-            if ($amountUsd > 0 && ($lockedTx->amount === 0.0 || $lockedTx->amount_usd === 0.0 || $lockedTx->amount !== round($amountNgn, 2))) {
+            if ($amountNgn > 0) {
+                $calc = FundingTransaction::calculateNetAndFee($amountNgn, 'pocketfi', $ngnPerUsd);
                 $lockedTx->amount = round($amountNgn, 2);
-                $lockedTx->amount_usd = round($amountUsd, 2);
+                $lockedTx->amount_usd = $calc['net_usd'];
                 $lockedTx->currency = 'NGN';
                 $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
                 $lockedTx->save();
@@ -235,6 +234,8 @@ class PocketFiWebhookController extends Controller
                 'payment_method' => (string) $lockedTx->payment_method,
                 'provider' => 'pocketfi',
                 'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                'gross_ngn' => $amountNgn,
+                'charge_percent' => FundingTransaction::getChargePercent('pocketfi'),
             ]);
 
             $lockedTx->status = 'approved';

@@ -214,6 +214,13 @@ class AppServiceProvider extends ServiceProvider
             $view->with('seoOgTitle', (string) ($defaults['seoOgTitle'] ?? ''));
             $view->with('seoOgDescription', (string) ($defaults['seoOgDescription'] ?? ''));
             $view->with('seoTwitterCard', (string) ($defaults['seoTwitterCard'] ?? 'summary_large_image'));
+            $rawAppUrl = (string) config('app.url');
+            $isLocal = $rawAppUrl === '' || str_contains($rawAppUrl, 'localhost') || str_contains($rawAppUrl, '127.0.0.1');
+            $emailPublicUrl = $isLocal ? 'https://may22sim.com' : rtrim($rawAppUrl, '/');
+            $emailLogoUrl = $emailPublicUrl . '/logo/favicon-192.png';
+            $view->with('emailPublicUrl', $emailPublicUrl);
+            $view->with('emailLogoUrl', $emailLogoUrl);
+
             $view->with('formatAmount', function ($amountUsd) use ($fx) {
                 return number_format(((float) $amountUsd) * $fx, 2);
             });

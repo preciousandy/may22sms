@@ -10,6 +10,8 @@ class DaisySmsService
 
     protected $baseUrl;
     protected $backupBaseUrls = [];
+    protected $proxy;
+    protected $flareSolverrUrl;
 
     // DaisySMS only provides USA numbers
     protected $countries = [
@@ -27,6 +29,94 @@ class DaisySmsService
 
         $this->apiKey = $dbKey !== '' ? $dbKey : (string) (config('services.daisysms.api_key') ?: '');
         $this->baseUrl = (string) (config('services.daisysms.base_url') ?: 'https://daisysms.io/stubs/handler_api.php');
+        $this->proxy = (string) (config('services.daisysms.proxy') ?: '');
+        $this->flareSolverrUrl = (string) (config('services.daisysms.flaresolverr_url') ?: '');
+    }
+
+    /**
+     * Build HTTP client with browser-like headers and proxy configuration to avoid bot protection blocks.
+     */
+    protected function request(int $timeout = 15)
+    {
+        $client = Http::timeout($timeout)->withHeaders([
+            'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept' => 'application/json, text/plain, */*',
+            'Accept-Language' => 'en-US,en;q=0.9',
+            'Cache-Control' => 'no-cache',
+        ]);
+
+        if (!empty($this->proxy)) {
+            $client = $client->withOptions(['proxy' => $this->proxy]);
+        }
+
+        return $client;
+    }
+
+    /**
+     * Send GET request directly or via FlareSolverr if configured.
+     * Returns array with 'body', 'headers' (lowercase keys), and 'status'.
+     */
+    protected function sendGet(string $url, array $params = [], int $timeout = 15): array
+    {
+        $queryString = http_build_query($params);
+        $fullUrl = $queryString !== '' ? ($url . (str_contains($url, '?') ? '&' : '?') . $queryString) : $url;
+
+        if (!empty($this->flareSolverrUrl)) {
+            try {
+                $fsResponse = Http::timeout(max($timeout, 45))->post($this->flareSolverrUrl, [
+                    'cmd' => 'request.get',
+                    'url' => $fullUrl,
+                    'maxTimeout' => 45000,
+                ]);
+
+                if ($fsResponse->successful()) {
+                    $fsData = $fsResponse->json();
+                    if (($fsData['status'] ?? '') === 'ok' && isset($fsData['solution']['response'])) {
+                        $rawBody = (string) $fsData['solution']['response'];
+                        if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $rawBody, $m)) {
+                            $extracted = trim(strip_tags($m[1]));
+                            if ($extracted !== '') {
+                                $rawBody = $extracted;
+                            }
+                        }
+
+                        $headers = [];
+                        if (isset($fsData['solution']['headers']) && is_array($fsData['solution']['headers'])) {
+                            foreach ($fsData['solution']['headers'] as $k => $v) {
+                                $headers[strtolower($k)] = $v;
+                            }
+                        }
+
+                        return [
+                            'body' => trim($rawBody),
+                            'headers' => $headers,
+                            'status' => (int) ($fsData['solution']['status'] ?? 200),
+                        ];
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("FlareSolverr request failed for {$fullUrl}: " . $e->getMessage());
+            }
+        }
+
+        $response = $this->request($timeout)->get($url, $params);
+
+        return [
+            'body' => trim((string) $response->body()),
+            'headers' => array_change_key_case($response->headers(), CASE_LOWER),
+            'status' => $response->status(),
+        ];
+    }
+
+    /**
+     * Detect if a response from DaisySMS is a Cloudflare anti-bot challenge page.
+     */
+    protected function isCloudflareChallenge(string $body): bool
+    {
+        return str_contains($body, '<title>Just a moment...</title>')
+            || str_contains($body, 'challenges.cloudflare.com')
+            || str_contains($body, '__cf_chl_')
+            || str_contains($body, 'Enable JavaScript and cookies to continue');
     }
 
     /**
@@ -40,53 +130,110 @@ class DaisySmsService
 
     public function getPrices($country)
     {
-        return \Illuminate\Support\Facades\Cache::remember('daisysms:prices:' . $country, 60, function () use ($country) {
-            $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
+        $cacheKey = 'daisysms:prices:' . $country;
 
-            foreach ($urlsToTry as $url) {
-                try {
-                    $response = Http::timeout(15)->get($url, [
-                        'api_key' => $this->apiKey,
-                        'action' => 'getPrices',
-                        'country' => $country
-                    ]);
+        $cached = \Illuminate\Support\Facades\Cache::get($cacheKey);
+        if (!empty($cached) && is_array($cached)) {
+            return $cached;
+        }
 
-                    $data = trim((string) $response->body());
-                    \Illuminate\Support\Facades\Log::info("DaisySMS getPrices response", [
+        $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
+
+        foreach ($urlsToTry as $url) {
+            try {
+                $res = $this->sendGet($url, [
+                    'api_key' => $this->apiKey,
+                    'action' => 'getPrices',
+                    'country' => $country
+                ], 15);
+
+                $data = $res['body'];
+
+                if ($this->isCloudflareChallenge($data)) {
+                    \Illuminate\Support\Facades\Log::warning("DaisySMS Cloudflare challenge detected for {$url}. The server IP may be blocked by Cloudflare bot protection.", [
                         'url_tried' => $url,
                         'country' => $country,
-                        'body' => $data
                     ]);
-
-                    if (!str_starts_with($data, 'ERROR') && !str_starts_with($data, 'WRONG_') && !str_starts_with($data, 'BAD_')) {
-                        $prices = json_decode($data, true);
-
-                        // Convert DaisySMS format to 5sim-like format for compatibility
-                        $result = [];
-                        if (is_array($prices)) {
-                            $result[$country] = [];
-                            foreach ($prices as $service => $details) {
-                                $result[$country][$service] = [
-                                    'any' => [
-                                        'cost' => (float)($details['cost'] ?? 0.0),
-                                        'count' => (int)($details['count'] ?? 999)
-                                    ]
-                                ];
-                            }
-                            return $result;
-                        }
-                    }
-
-                    if ($data !== '') {
-                        break;
-                    }
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning("DaisySMS getPrices exception for {$url}: " . $e->getMessage());
+                    break;
                 }
-            }
 
-            return [];
-        });
+                \Illuminate\Support\Facades\Log::info("DaisySMS getPrices response", [
+                    'url_tried' => $url,
+                    'country' => $country,
+                    'body' => substr($data, 0, 500)
+                ]);
+
+                if (!str_starts_with($data, 'ERROR') && !str_starts_with($data, 'WRONG_') && !str_starts_with($data, 'BAD_')) {
+                    $prices = json_decode($data, true);
+
+                    if (is_array($prices) && !empty($prices)) {
+                        $result = $this->formatPrices($country, $prices);
+                        \Illuminate\Support\Facades\Cache::put($cacheKey, $result, 600);
+
+                        try {
+                            file_put_contents(storage_path("app/daisysms_prices_{$country}.json"), $data);
+                        } catch (\Throwable $e) {}
+
+                        return $result;
+                    }
+                }
+
+                if ($data !== '') {
+                    break;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("DaisySMS getPrices exception for {$url}: " . $e->getMessage());
+            }
+        }
+
+        // Fallback: load saved or bundled prices so services are always visible to customers
+        return $this->getFallbackPrices($country);
+    }
+
+    /**
+     * Format raw DaisySMS prices into 5sim-compatible structure.
+     */
+    protected function formatPrices(string $country, array $prices): array
+    {
+        $result = [];
+        $result[$country] = [];
+        foreach ($prices as $service => $details) {
+            $result[$country][$service] = [
+                'any' => [
+                    'cost' => (float)($details['cost'] ?? 0.0),
+                    'count' => (int)($details['count'] ?? 999)
+                ]
+            ];
+        }
+        return $result;
+    }
+
+    /**
+     * Retrieve fallback prices from storage or bundled resource files.
+     */
+    protected function getFallbackPrices(string $country): array
+    {
+        $paths = [
+            storage_path("app/daisysms_prices_{$country}.json"),
+            resource_path("data/daisysms_prices_{$country}.json"),
+        ];
+
+        foreach ($paths as $path) {
+            if (file_exists($path)) {
+                try {
+                    $raw = file_get_contents($path);
+                    $prices = json_decode($raw, true);
+                    if (is_array($prices) && !empty($prices)) {
+                        $result = $this->formatPrices($country, $prices);
+                        // Cache fallback for 120 seconds so it retries live API periodically
+                        \Illuminate\Support\Facades\Cache::put('daisysms:prices:' . $country, $result, 120);
+                        return $result;
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
+        return [];
     }
 
     public function getBalance()
@@ -95,12 +242,18 @@ class DaisySmsService
 
         foreach ($urlsToTry as $url) {
             try {
-                $response = Http::timeout(15)->get($url, [
+                $res = $this->sendGet($url, [
                     'api_key' => $this->apiKey,
                     'action' => 'getBalance'
-                ]);
+                ], 15);
 
-                $body = trim((string) $response->body());
+                $body = $res['body'];
+
+                if ($this->isCloudflareChallenge($body)) {
+                    \Illuminate\Support\Facades\Log::warning("DaisySMS getBalance encountered Cloudflare challenge for {$url}");
+                    return ['error' => 'DaisySMS blocked request with a Cloudflare bot challenge. Server IP might require whitelisting or proxy.'];
+                }
+
                 \Illuminate\Support\Facades\Log::info("DaisySMS getBalance response", [
                     'url_tried' => $url,
                     'body' => $body
@@ -139,14 +292,21 @@ class DaisySmsService
 
         foreach ($urlsToTry as $url) {
             try {
-                $response = Http::timeout(45)->get($url, [
+                $res = $this->sendGet($url, [
                     'api_key' => $this->apiKey,
                     'action' => 'getNumber',
                     'service' => $product,
                     'country' => $country
-                ]);
+                ], 45);
 
-                $body = trim((string) $response->body());
+                $body = $res['body'];
+
+                if ($this->isCloudflareChallenge($body)) {
+                    \Illuminate\Support\Facades\Log::warning("DaisySMS buyNumber encountered Cloudflare challenge for {$url}");
+                    $lastError = 'DaisySMS blocked request with Cloudflare verification challenge. Server IP may be restricted.';
+                    break;
+                }
+
                 \Illuminate\Support\Facades\Log::info("DaisySMS buyNumber response", [
                     'url_tried' => $url,
                     'country' => $country,
@@ -160,10 +320,8 @@ class DaisySmsService
                     $phone = $parts[2] ?? '';
 
                     // Try to get price from headers first, else use fallback
-                    $price = $response->header('X-Price', 0);
-                    if (empty($price) || !is_numeric($price)) {
-                        $price = $fallbackPrice;
-                    }
+                    $priceHeader = $res['headers']['x-price'][0] ?? ($res['headers']['x-price'] ?? 0);
+                    $price = !empty($priceHeader) && is_numeric($priceHeader) ? (float) $priceHeader : $fallbackPrice;
 
                     return [
                         'id' => $id,
@@ -207,15 +365,21 @@ class DaisySmsService
 
         foreach ($urlsToTry as $url) {
             try {
-                $response = Http::timeout(20)->get($url, [
+                $res = $this->sendGet($url, [
                     'api_key' => $this->apiKey,
                     'action' => 'getStatus',
                     'id' => $orderId,
                     'text' => 1
-                ]);
+                ], 20);
 
-                $body = trim((string) $response->body());
-                $text = (string) $response->header('X-Text', '');
+                $body = $res['body'];
+                $textHeader = $res['headers']['x-text'][0] ?? ($res['headers']['x-text'] ?? '');
+                $text = (string) $textHeader;
+
+                if ($this->isCloudflareChallenge($body)) {
+                    \Illuminate\Support\Facades\Log::warning("DaisySMS checkSms encountered Cloudflare challenge for order {$orderId}");
+                    return ['status' => 'PENDING'];
+                }
 
                 \Illuminate\Support\Facades\Log::info("DaisySMS checkSms response", [
                     'url_tried' => $url,
@@ -284,21 +448,21 @@ class DaisySmsService
 
         foreach ($urlsToTry as $url) {
             try {
-                $response = Http::timeout(15)->get($url, [
+                $res = $this->sendGet($url, [
                     'api_key' => $this->apiKey,
                     'action' => 'setStatus',
                     'id' => $orderId,
                     'status' => 8,
-                ]);
+                ], 15);
 
-                $body = trim((string) $response->body());
+                $body = $res['body'];
                 \Illuminate\Support\Facades\Log::info("DaisySMS cancelOrder response", [
                     'url_tried' => $url,
                     'order_id' => $orderId,
                     'body' => $body,
                 ]);
 
-                if ($body === 'ACCESS_CANCEL' || $body === 'STATUS_CANCEL' || str_starts_with($body, 'ACCESS_')) {
+                if (str_starts_with($body, 'ACCESS_CANCEL') || str_starts_with($body, 'STATUS_CANCEL') || str_starts_with($body, 'ACCESS_')) {
                     return ['success' => true, 'body' => $body];
                 }
 
@@ -323,14 +487,14 @@ class DaisySmsService
 
         foreach ($urlsToTry as $url) {
             try {
-                $response = Http::timeout(15)->get($url, [
+                $res = $this->sendGet($url, [
                     'api_key' => $this->apiKey,
                     'action' => 'setStatus',
                     'id' => $orderId,
                     'status' => 3,
-                ]);
+                ], 15);
 
-                $body = trim((string) $response->body());
+                $body = $res['body'];
                 \Illuminate\Support\Facades\Log::info("DaisySMS finishOrder response", [
                     'url_tried' => $url,
                     'order_id' => $orderId,

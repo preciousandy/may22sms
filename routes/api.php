@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\MonietudeWebhookController;
 use App\Http\Controllers\NowPaymentsWebhookController;
 use App\Http\Controllers\PaymentPointWebhookController;
 use App\Http\Controllers\PocketFiWebhookController;
@@ -26,3 +27,5 @@ Route::post('/nowpayments/ipn', [NowPaymentsWebhookController::class, 'handle'])
 Route::post('/paymentpoint/webhook', [PaymentPointWebhookController::class, 'handle']);
 Route::post('/strollwallet/webhook', [StrollwalletWebhookController::class, 'handle']);
 Route::post('/pocketfi/webhook', [PocketFiWebhookController::class, 'handle']);
+Route::post('/monietude/webhook', [MonietudeWebhookController::class, 'handle']);
+

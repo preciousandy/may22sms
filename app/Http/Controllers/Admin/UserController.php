@@ -558,4 +558,156 @@ class UserController extends Controller
 
         return redirect('/dashboard');
     }
+
+    public function destroy(Request $request, $id)
+    {
+        $admin = auth()->user();
+        if ($admin && (int) $admin->id === (int) $id) {
+            return back()->withErrors(['error' => 'You cannot delete your own account.']);
+        }
+
+        $user = User::findOrFail($id);
+
+        if ($user->is_admin && (int) $user->id === 1 && (int) ($admin->id ?? 0) !== 1) {
+            return back()->withErrors(['error' => 'You cannot delete the primary administrator account.']);
+        }
+
+        $userName = $user->name;
+        $userEmail = $user->email;
+
+        DB::beginTransaction();
+        try {
+            if (method_exists($user, 'tokens')) {
+                $user->tokens()->delete();
+            }
+
+            DB::table('favorites')->where('user_id', $user->id)->delete();
+            DB::table('log_carts')->where('user_id', $user->id)->delete();
+            DB::table('daily_login_gifts')->where('user_id', $user->id)->delete();
+            DB::table('reviews')->where('user_id', $user->id)->delete();
+            DB::table('order_reports')->where('user_id', $user->id)->delete();
+
+            $ticketIds = DB::table('support_tickets')->where('user_id', $user->id)->pluck('id');
+            if ($ticketIds->isNotEmpty()) {
+                DB::table('support_ticket_messages')->whereIn('support_ticket_id', $ticketIds)->delete();
+                DB::table('support_tickets')->whereIn('id', $ticketIds)->delete();
+            }
+
+            DB::table('sms_orders')->where('user_id', $user->id)->delete();
+            DB::table('boost_orders')->where('user_id', $user->id)->delete();
+            DB::table('log_orders')->where('user_id', $user->id)->delete();
+            DB::table('funding_transactions')->where('user_id', $user->id)->delete();
+            DB::table('wallet_transactions')->where('user_id', $user->id)->delete();
+            DB::table('system_transactions')->where('user_id', $user->id)->update(['user_id' => null]);
+
+            $user->delete();
+
+            SystemTransaction::create([
+                'actor_user_id' => $admin ? $admin->id : null,
+                'type' => 'user',
+                'action' => 'delete',
+                'status' => 'completed',
+                'subject_type' => User::class,
+                'subject_id' => (string) $id,
+                'before' => [
+                    'name' => $userName,
+                    'email' => $userEmail,
+                ],
+            ]);
+
+            DB::commit();
+
+            return redirect('/admin/users')->with('success', "User '{$userName}' (#{$id}) was deleted successfully.");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("Failed to delete user #{$id}: " . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to delete user: ' . $e->getMessage()]);
+        }
+    }
+
+    public function bulkDestroy(Request $request)
+    {
+        $validated = $request->validate([
+            'user_ids' => 'required|array|min:1',
+            'user_ids.*' => 'integer|exists:users,id',
+        ]);
+
+        $admin = auth()->user();
+        $adminId = $admin ? (int) $admin->id : 0;
+
+        $userIds = array_values(array_unique(array_map('intval', $validated['user_ids'])));
+
+        // Exclude current admin
+        $userIds = array_values(array_filter($userIds, function ($id) use ($adminId) {
+            return $id !== $adminId;
+        }));
+
+        // Protect primary admin account (#1) from non-primary admins
+        if ($adminId !== 1) {
+            $userIds = array_values(array_filter($userIds, function ($id) {
+                return $id !== 1;
+            }));
+        }
+
+        if (empty($userIds)) {
+            return back()->withErrors(['error' => 'No eligible users selected for deletion (you cannot delete yourself or the primary admin).']);
+        }
+
+        DB::beginTransaction();
+        try {
+            $usersToDelete = User::whereIn('id', $userIds)->get(['id', 'name', 'email']);
+            $deletedCount = 0;
+            $deletedNames = [];
+
+            foreach ($usersToDelete as $user) {
+                if (method_exists($user, 'tokens')) {
+                    $user->tokens()->delete();
+                }
+
+                DB::table('favorites')->where('user_id', $user->id)->delete();
+                DB::table('log_carts')->where('user_id', $user->id)->delete();
+                DB::table('daily_login_gifts')->where('user_id', $user->id)->delete();
+                DB::table('reviews')->where('user_id', $user->id)->delete();
+                DB::table('order_reports')->where('user_id', $user->id)->delete();
+
+                $ticketIds = DB::table('support_tickets')->where('user_id', $user->id)->pluck('id');
+                if ($ticketIds->isNotEmpty()) {
+                    DB::table('support_ticket_messages')->whereIn('support_ticket_id', $ticketIds)->delete();
+                    DB::table('support_tickets')->whereIn('id', $ticketIds)->delete();
+                }
+
+                DB::table('sms_orders')->where('user_id', $user->id)->delete();
+                DB::table('boost_orders')->where('user_id', $user->id)->delete();
+                DB::table('log_orders')->where('user_id', $user->id)->delete();
+                DB::table('funding_transactions')->where('user_id', $user->id)->delete();
+                DB::table('wallet_transactions')->where('user_id', $user->id)->delete();
+                DB::table('system_transactions')->where('user_id', $user->id)->update(['user_id' => null]);
+
+                $deletedNames[] = "#{$user->id} ({$user->name})";
+                $user->delete();
+                $deletedCount++;
+            }
+
+            SystemTransaction::create([
+                'actor_user_id' => $adminId ?: null,
+                'type' => 'user',
+                'action' => 'bulk_delete',
+                'status' => 'completed',
+                'subject_type' => User::class,
+                'subject_id' => implode(',', $userIds),
+                'after' => [
+                    'count' => $deletedCount,
+                    'users' => $deletedNames,
+                ],
+            ]);
+
+            DB::commit();
+
+            return redirect('/admin/users')->with('success', "Successfully deleted {$deletedCount} user(s).");
+        } catch (\Throwable $e) {
+            DB::rollBack();
+            Log::error("Failed to bulk delete users: " . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to delete selected users: ' . $e->getMessage()]);
+        }
+    }
 }

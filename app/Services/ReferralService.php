@@ -15,6 +15,11 @@ class ReferralService
             return;
         }
 
+        // Guard: Do NOT award a bonus if the user referred themselves
+        if ((int) $user->referred_by === (int) $user->id) {
+            return;
+        }
+
         $alreadyPaid = WalletTransaction::where('type', 'referral_bonus')
             ->where('reference', 'REFBONUS-'.(string) $fundingTx->id)
             ->exists();
@@ -22,6 +27,7 @@ class ReferralService
             return;
         }
 
+        // Only award on the FIRST ever funding (count must be 0 before this credit, i.e. exactly 1 now)
         $fundingCreditsCount = WalletTransaction::where('user_id', $user->id)
             ->where('type', 'funding_credit')
             ->count();
@@ -31,6 +37,11 @@ class ReferralService
 
         $referrer = User::find($user->referred_by);
         if (! $referrer) {
+            return;
+        }
+
+        // Guard: Referrer cannot be the same account as the person who funded
+        if ((int) $referrer->id === (int) $user->id) {
             return;
         }
 

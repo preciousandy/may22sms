@@ -1,296 +1,929 @@
 @extends('layouts.dashboard')
 
-@section('page_title', 'Overview')
+@section('page_title', 'Dashboard')
 
 @section('dashboard_content')
-<div
-    x-data="{
-        index: 0,
-        slides: [
-            {
-                title: @js('Welcome back, ' . explode(' ', auth()->user()->name ?? 'User')[0] . '!'),
-                body: @js('Your central hub for SMS verification, premium social media accounts, and boosting services.'),
-                primaryHref: '/funding',
-                primaryLabel: 'Add Funds',
-                secondaryHref: '/social-boosting',
-                secondaryLabel: 'Start Boosting'
+<style>
+@keyframes opay-gift-bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-4px) scale(1.08); }
+}
+@keyframes opay-glow-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.6); }
+    50% { box-shadow: 0 0 18px 4px rgba(245, 158, 11, 0.35); }
+}
+@keyframes opay-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+}
+.opay-gift-bounce {
+    animation: opay-gift-bounce 2s ease-in-out infinite;
+}
+.opay-glow-pulse {
+    animation: opay-glow-pulse 2s ease-in-out infinite;
+}
+.opay-progress-shimmer {
+    background: linear-gradient(90deg, #f59e0b 0%, #ea580c 50%, #facc15 100%);
+    background-size: 200% 100%;
+    animation: opay-shimmer 2.4s ease-in-out infinite;
+}
+</style>
+
+<div class="space-y-6">
+
+    <!-- 1. OPay Signature Emerald / Teal Wallet Balance Hero Card -->
+    <div x-data="{ 
+            showBalance: localStorage.getItem('opay_show_balance') !== 'false',
+            copiedId: false,
+            toggleBalance() {
+                this.showBalance = !this.showBalance;
+                localStorage.setItem('opay_show_balance', this.showBalance);
             },
-            {
-                title: @js('Quick Tip'),
-                body: @js('Switch USD/NGN from the top right to see the real cost of services in your currency.'),
-                primaryHref: '/sms-verify',
-                primaryLabel: 'Get a Number',
-                secondaryHref: '/logs-store',
-                secondaryLabel: 'Browse Logs'
-            },
-            {
-                title: @js('Keep Your Account Updated'),
-                body: @js('Update your profile details and change your password anytime from your Profile page.'),
-                primaryHref: '/profile',
-                primaryLabel: 'Update Profile',
-                secondaryHref: '/funding',
-                secondaryLabel: 'View Funding'
+            copyId(id) {
+                if (navigator.clipboard) { navigator.clipboard.writeText(id); }
+                this.copiedId = true;
+                setTimeout(() => this.copiedId = false, 1500);
             }
-        ],
-        next() { this.index = (this.index + 1) % this.slides.length; },
-        prev() { this.index = (this.index - 1 + this.slides.length) % this.slides.length; },
-        go(i) { this.index = i; }
-    }"
-    x-init="setInterval(() => next(), 6500)"
-    class="bg-gradient-to-r from-[#0d9488] to-teal-700 rounded-2xl p-6 sm:p-8 mb-8 text-white shadow-lg relative overflow-hidden"
->
-    <div class="relative z-10 w-full">
-        <h2 class="text-2xl sm:text-3xl font-bold mb-2" x-text="slides[index].title"></h2>
-        <p class="text-teal-100 max-w-xl text-sm sm:text-base" x-text="slides[index].body"></p>
-        <div class="mt-6 flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4 w-full sm:w-auto">
-            <a :href="slides[index].primaryHref" class="bg-[#facc15] text-black px-6 py-2 rounded-lg font-bold shadow-md hover:bg-yellow-400 transition text-center" x-text="slides[index].primaryLabel"></a>
-            <a :href="slides[index].secondaryHref" class="bg-white/20 text-white backdrop-blur-sm border border-white/30 px-6 py-2 rounded-lg font-medium hover:bg-white/30 transition text-center" x-text="slides[index].secondaryLabel"></a>
+         }"
+         class="relative bg-gradient-to-br from-[#0d9488] via-[#0f766e] to-[#042f2e] rounded-3xl p-5 sm:p-7 text-white shadow-xl shadow-teal-900/15 overflow-hidden border border-teal-600/30">
+        
+        <!-- Subtle Top Gold Accent Line -->
+        <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-300 via-amber-300 to-emerald-400"></div>
+
+        <!-- Ambient Watermark Curves in Background -->
+        <div class="absolute -right-12 -top-12 w-64 h-64 rounded-full bg-white/5 blur-2xl pointer-events-none"></div>
+        <div class="absolute right-6 bottom-4 opacity-10 pointer-events-none">
+            <svg class="w-36 h-36 text-white" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 22h20L12 2z"/></svg>
         </div>
 
-        <div class="mt-6 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <template x-for="(s, i) in slides" :key="i">
-                    <button type="button" @click="go(i)" class="h-2.5 rounded-full transition" :class="index === i ? 'w-8 bg-white' : 'w-2.5 bg-white/40 hover:bg-white/60'" aria-label="Go to slide"></button>
-                </template>
-            </div>
-            <div class="flex items-center gap-2">
-                <button type="button" @click="prev()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-sm flex items-center justify-center" aria-label="Previous slide">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+        <div class="relative z-10 flex flex-col justify-between min-h-[170px] sm:min-h-[190px]">
+            
+            <!-- Card Header: Balance Label & Actions -->
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xs sm:text-sm font-bold text-teal-100/90 tracking-wide">Available Balance</span>
+                    <!-- Hide / Show Eye Toggle -->
+                    <button type="button" @click="toggleBalance()" class="text-teal-200 hover:text-white p-1 rounded-lg transition hover:bg-white/10 cursor-pointer" :title="showBalance ? 'Hide balance' : 'Show balance'" aria-label="Toggle balance visibility">
+                        <template x-if="showBalance">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
+                        </template>
+                        <template x-if="!showBalance">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l18 18"/></svg>
+                        </template>
+                    </button>
+                </div>
+
+                <!-- Account ID Badge with 1-Click Copy -->
+                <button type="button" @click="copyId('{{ auth()->user()->id }}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xs border border-white/15 text-xs font-mono font-bold text-teal-100 transition cursor-pointer">
+                    <span>ID: #{{ auth()->user()->id }}</span>
+                    <span x-show="!copiedId" class="text-[10px] text-teal-300">📋</span>
+                    <span x-show="copiedId" style="display:none;" class="text-[10px] text-amber-300 font-sans font-bold">Copied!</span>
                 </button>
-                <button type="button" @click="next()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 backdrop-blur-sm flex items-center justify-center" aria-label="Next slide">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
-                </button>
             </div>
-        </div>
-    </div>
-    <div class="absolute right-0 top-0 opacity-10 transform translate-x-1/4 -translate-y-1/4">
-        <svg width="300" height="300" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 22h20L12 2z"/></svg>
-    </div>
-</div>
 
-<!-- Quick Stats -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
-    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center">
-        <div class="w-14 h-14 rounded-full bg-teal-50 flex items-center justify-center text-[#0d9488]">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-        </div>
-        <div class="ml-4">
-            <h3 class="text-gray-500 text-sm font-medium">Available Balance</h3>
-            <p class="text-2xl font-bold text-gray-900">{{ $currencySymbol ?? '$' }}{{ ($formatAmount ?? fn($x) => number_format($x, 2))(auth()->user()->walletBalance ?? 0) }}</p>
-        </div>
-    </div>
-    
-    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center">
-        <div class="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-500">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
-        </div>
-        <div class="ml-4">
-            <h3 class="text-gray-500 text-sm font-medium">SMS Numbers</h3>
-            <p class="text-2xl font-bold text-gray-900">{{ $smsNumbersCount ?? 0 }}</p>
-        </div>
-    </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center">
-        <div class="w-14 h-14 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-        </div>
-        <div class="ml-4">
-            <h3 class="text-gray-500 text-sm font-medium">Logs Purchased</h3>
-            <p class="text-2xl font-bold text-gray-900">{{ $logsPurchasedCount ?? 0 }}</p>
-        </div>
-    </div>
-
-    <div class="bg-white rounded-2xl shadow-sm p-6 border border-gray-100 flex items-center">
-        <div class="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center text-purple-500">
-            <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-        </div>
-        <div class="ml-4">
-            <h3 class="text-gray-500 text-sm font-medium">Active Boosts</h3>
-            <p class="text-2xl font-bold text-gray-900">{{ $boostsCount ?? 0 }}</p>
-        </div>
-    </div>
-</div>
-
-<div id="exchange" class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-    <div class="px-6 py-5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-        <div>
-            <h3 class="text-lg font-bold text-gray-800">Currency Exchange</h3>
-            <p class="text-sm text-gray-500">Live rate for reference (display only).</p>
-        </div>
-        <div class="text-sm font-bold text-gray-800">
-            1 USD = ₦{{ number_format((float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500), 2) }}
-        </div>
-    </div>
-    <div class="p-6" x-data="{
-        rate: {{ (float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500) }},
-        usd: '',
-        ngn: '',
-        format2(v) { return Number(v || 0).toFixed(2); },
-        fromUsd() {
-            const u = Number(this.usd || 0);
-            if (!isFinite(u) || this.rate <= 0) { this.ngn = ''; return; }
-            this.ngn = this.format2(u * this.rate);
-        },
-        fromNgn() {
-            const n = Number(this.ngn || 0);
-            if (!isFinite(n) || this.rate <= 0) { this.usd = ''; return; }
-            this.usd = this.format2(n / this.rate);
-        }
-    }">
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div class="lg:col-span-2">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">USD</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <span class="text-gray-500 font-bold">$</span>
-                            </div>
-                            <input type="number" inputmode="decimal" step="0.01" min="0" x-model="usd" @input="fromUsd()" class="block w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] text-lg font-bold text-gray-900 transition" placeholder="0.00">
-                        </div>
+            <!-- Big High-Contrast Currency Balance Display -->
+            <div class="my-2">
+                <div class="flex items-baseline gap-2">
+                    <div class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-white font-mono flex items-center">
+                        <span x-show="showBalance">
+                            {{ $currencySymbol ?? '$' }}{{ number_format((auth()->user()->walletBalance ?? 0) * ($currencyFx ?? 1), 2) }}
+                        </span>
+                        <span x-show="!showBalance" style="display: none;" class="tracking-widest text-teal-200">
+                            ••••••••
+                        </span>
                     </div>
-
-                    <div>
-                        <label class="block text-sm font-bold text-gray-700 mb-2">NGN</label>
-                        <div class="relative">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <span class="text-gray-500 font-bold">₦</span>
-                            </div>
-                            <input type="number" inputmode="decimal" step="1" min="0" x-model="ngn" @input="fromNgn()" class="block w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] text-lg font-bold text-gray-900 transition" placeholder="0.00">
-                        </div>
-                    </div>
+                    <span class="text-xs font-black uppercase tracking-wider text-teal-200 bg-teal-800/60 px-2 py-0.5 rounded-md border border-teal-400/20">
+                        {{ $currency ?? 'USD' }}
+                    </span>
                 </div>
 
-                <div class="mt-5 flex flex-wrap gap-2">
-                    <button type="button" @click="usd='5'; fromUsd()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-sm hover:bg-gray-200 transition">$5</button>
-                    <button type="button" @click="usd='10'; fromUsd()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-sm hover:bg-gray-200 transition">$10</button>
-                    <button type="button" @click="usd='20'; fromUsd()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-sm hover:bg-gray-200 transition">$20</button>
-                    <button type="button" @click="ngn='1000'; fromNgn()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-sm hover:bg-gray-200 transition">₦1,000</button>
-                    <button type="button" @click="ngn='5000'; fromNgn()" class="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 font-bold text-sm hover:bg-gray-200 transition">₦5,000</button>
-                    <button type="button" @click="usd=''; ngn='';" class="px-3 py-2 rounded-lg bg-white border border-gray-200 text-gray-700 font-bold text-sm hover:bg-gray-50 transition">Clear</button>
+                <!-- Secondary Currency Hint & Live Rate -->
+                <div class="text-xs text-teal-200/90 font-medium mt-1 flex items-center gap-2">
+                    @if(($currency ?? 'USD') === 'NGN')
+                        <span>≈ ${{ number_format((float) (auth()->user()->walletBalance ?? 0), 2) }} USD</span>
+                    @else
+                        <span>≈ ₦{{ number_format((float) ((auth()->user()->walletBalance ?? 0) * ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500)), 2) }} NGN</span>
+                    @endif
+                    <span>&bull;</span>
+                    <span class="text-emerald-300 font-bold flex items-center gap-1">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
+                        Instant Automated
+                    </span>
                 </div>
             </div>
 
-            <div class="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                <div class="text-sm font-bold text-gray-800 mb-2">Rate Details</div>
-                <div class="text-sm text-gray-600">1 USD = ₦{{ number_format((float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500), 2) }}</div>
-                <div class="text-sm text-gray-600">₦{{ number_format((float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500), 2) }} = 1 USD</div>
-                <div class="mt-4 flex flex-col gap-2">
-                    <a href="/funding" class="bg-[#facc15] text-black px-4 py-2 rounded-lg font-bold text-center hover:bg-yellow-400 transition">Add Funds</a>
-                    <a href="/profile" class="bg-gray-900 text-white px-4 py-2 rounded-lg font-bold text-center hover:bg-gray-800 transition">Update Profile</a>
-                </div>
+            <!-- OPay Quick Action Buttons Row -->
+            <div class="pt-3 border-t border-white/10 flex flex-wrap items-center gap-2.5 sm:gap-3">
+                <!-- + Add Money (Primary High-Contrast Button) -->
+                <a href="/funding" class="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 to-yellow-400 hover:from-amber-300 hover:to-yellow-300 text-slate-950 font-black text-xs sm:text-sm shadow-md hover:shadow-lg transition-transform active:scale-95 shrink-0">
+                    <span class="text-base font-black">+</span>
+                    <span>Add Money</span>
+                </a>
+
+                <!-- Wallet Ledger -->
+                <a href="/wallet" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-xs text-white font-bold text-xs sm:text-sm transition-transform active:scale-95 shrink-0 border border-white/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    <span>Ledger</span>
+                </a>
+
+                <!-- Save Small Small Shortcut -->
+                <a href="/savings" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500/80 to-teal-600/80 hover:from-emerald-500 hover:to-teal-600 backdrop-blur-xs text-white font-bold text-xs sm:text-sm transition-transform active:scale-95 shrink-0 border border-emerald-400/30 shadow-sm">
+                    <span>💰</span>
+                    <span>Save Small Small</span>
+                    <span class="text-[9px] font-black uppercase bg-[#facc15] text-slate-950 px-1.5 py-0.2 rounded-md">16.9%</span>
+                </a>
+
+                <!-- Calculator shortcut -->
+                <a href="#exchange-calculator" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-teal-100 font-bold text-xs sm:text-sm transition shrink-0 ml-auto">
+                    <svg class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
+                    <span class="hidden sm:inline">Rate Calc</span>
+                </a>
             </div>
         </div>
     </div>
-</div>
 
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-    <!-- Recent Orders Table -->
-    <div x-data="{ filter: 'all' }" class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center">
+    <!-- Tutorial & How-To-Use Guide Banner -->
+    <div class="relative overflow-hidden rounded-3xl p-4 sm:p-5 text-white shadow-md border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4"
+         style="background: linear-gradient(135deg, #090d16 0%, #0f172a 60%, #0d9488 100%) !important;">
+        <div class="flex items-center gap-3.5">
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center text-2xl shadow-md shrink-0">
+                🎓
+            </div>
             <div>
-                <h3 class="text-lg font-bold text-gray-800">Recent Activity</h3>
-                <div class="mt-2 flex flex-wrap gap-2">
-                    <button type="button" @click="filter='all'" class="text-xs font-bold px-3 py-1 rounded-full" :class="filter==='all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'">All</button>
-                    <button type="button" @click="filter='sms'" class="text-xs font-bold px-3 py-1 rounded-full" :class="filter==='sms' ? 'bg-blue-600 text-white' : 'bg-blue-50 text-blue-700 hover:bg-blue-100'">SMS</button>
-                    <button type="button" @click="filter='logs'" class="text-xs font-bold px-3 py-1 rounded-full" :class="filter==='logs' ? 'bg-yellow-600 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'">LOGS</button>
-                    <button type="button" @click="filter='boost'" class="text-xs font-bold px-3 py-1 rounded-full" :class="filter==='boost' ? 'bg-purple-600 text-white' : 'bg-purple-50 text-purple-700 hover:bg-purple-100'">BOOST</button>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-black text-amber-300 uppercase tracking-wider">Site Tutorials</span>
+                    <span class="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-white/20 text-white">User Guide</span>
                 </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <a href="/profile" class="text-sm font-medium text-white bg-gray-900 px-4 py-2 rounded-lg hover:bg-gray-800 transition">Profile</a>
-                <a href="/sms-verify" class="text-sm font-medium text-[#0d9488] hover:underline">View SMS</a>
+                <h4 class="text-sm sm:text-base font-black text-white">How to use every service on May22SMS</h4>
+                <p class="text-xs text-slate-300">Illustrated step-by-step guides for SMS verify, logs, boosting, &amp; wallet funding.</p>
             </div>
         </div>
+        <a href="/tutorials" class="px-4 py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-900 font-black text-xs uppercase tracking-wider shrink-0 transition active:scale-95 shadow-sm flex items-center gap-1.5">
+            <span>Read Tutorials</span>
+            <span>&rarr;</span>
+        </a>
+    </div>
+
+    <!-- 2. OPay Signature Quick Services Hub (4 Columns Mobile / 12 Columns Desktop) -->
+    <div class="bg-white rounded-3xl p-5 sm:p-6 shadow-xs border border-slate-200/80">
+        <div class="flex items-center justify-between mb-4 px-1">
+            <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-[#0d9488]"></span>
+                Quick Services
+            </h3>
+            <a href="/tutorials" class="text-xs font-bold text-[#0d9488] hover:underline flex items-center gap-1">
+                <span>How to use</span>
+                <span>&rarr;</span>
+            </a>
+        </div>
+
+        <div class="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-6 xl:grid-cols-12 gap-3 sm:gap-4">
+            
+            <!-- Tile 1: SMS Verification -->
+            <a href="/sms-verify" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                    HOT
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-[#0d9488] text-white flex items-center justify-center text-2xl shadow-md shadow-teal-500/20 group-hover:scale-110 transition-transform mb-2">
+                    📱
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">SMS Verify</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Virtual No.</span>
+            </a>
+
+            <!-- Tile 2: Digital Logs -->
+            <a href="/logs-store" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-2xl shadow-md shadow-orange-500/20 group-hover:scale-110 transition-transform mb-2">
+                    📄
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Logs Store</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Accounts</span>
+            </a>
+
+            <!-- Tile 3: Social Boosting -->
+            <a href="/social-boosting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-md shadow-purple-500/20 group-hover:scale-110 transition-transform mb-2">
+                    🚀
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Social Boost</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Followers</span>
+            </a>
+
+            <!-- Tile 4: Add Money / Fund Wallet -->
+            <a href="/funding" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    💳
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Add Money</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Instant Top-up</span>
+            </a>
+
+            <!-- Tile 5: Receive Crypto & Convert to Naira (NEW) -->
+            <a href="/services/crypto-to-naira" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    NEW
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2">
+                    🪙
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Receive Crypto</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Convert To Naira</span>
+            </a>
+
+            <!-- Tile 6: Airtime & Data (NEW) -->
+            <a href="/services/airtime-data" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    NEW
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
+                    📶
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Airtime &amp; Data</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">VTU &amp; Bundles</span>
+            </a>
+
+            <!-- Tile 7: Electricity (NEW) -->
+            <a href="/services/electricity" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    NEW
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 text-white flex items-center justify-center text-2xl shadow-md shadow-yellow-500/20 group-hover:scale-110 transition-transform mb-2">
+                    ⚡
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Electricity</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Bills &amp; Tokens</span>
+            </a>
+
+            <!-- Tile 8: Betting (NEW) -->
+            <a href="/services/betting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    NEW
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    🎯
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Betting</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Fund Wallets</span>
+            </a>
+
+            <!-- Tile 9: Save Small Small (HOT / 16.9%) -->
+            <a href="/savings" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-amber-500 to-emerald-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    16.9%
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    💰
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Save Small</span>
+                <span class="text-[10px] font-bold text-emerald-600 mt-0.5">16.9% P.A.</span>
+            </a>
+
+            <!-- Tile 9: Daily Gift (With Pulsing Free Badge) -->
+            <a href="#daily-gift" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-bounce z-10">
+                    FREE
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2 opay-gift-bounce">
+                    🎁
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Daily Gift</span>
+                <span class="text-[10px] font-bold text-amber-600 mt-0.5">Streak Bonus</span>
+            </a>
+
+            <!-- Tile 9: SportyBet Codes -->
+            <a href="/sporty-bet-codes" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center text-2xl shadow-md shadow-red-500/20 group-hover:scale-110 transition-transform mb-2">
+                    ⚽
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">SportyBet</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Codes &amp; Bets</span>
+            </a>
+
+            <!-- Tile 10: Orders History Tracker -->
+            <a href="/orders" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
+                    📦
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">My Orders</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">Live Tracker</span>
+            </a>
+
+            <!-- Tile 11: 24/7 Support Desk -->
+            <a href="/tickets" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 text-white flex items-center justify-center text-2xl shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform mb-2">
+                    🎧
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Support</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">24/7 Desk</span>
+            </a>
+
+            <!-- Tile 12: Tutorials & How-To Guides (NEW) -->
+            <a href="/tutorials" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
+                <span class="absolute top-1 right-2 bg-gradient-to-r from-teal-500 to-indigo-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                    GUIDE
+                </span>
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-2xl shadow-md shadow-indigo-500/20 group-hover:scale-110 transition-transform mb-2">
+                    🎓
+                </div>
+                <span class="text-xs font-black text-slate-800 leading-tight">Tutorials</span>
+                <span class="text-[10px] font-bold text-slate-400 mt-0.5">How To Use</span>
+            </a>
+
+        </div>
+    </div>
+
+    <!-- 3. OPay Gamified Daily Check-In Rewards Card -->
+    <div id="daily-gift" x-data="dailyGiftComponent()" x-init="init()" x-show="enabled" x-cloak class="bg-white rounded-3xl shadow-xs border border-amber-200 overflow-hidden relative transition-all duration-300">
+        <!-- Top glowing amber stripe -->
+        <div class="h-2 bg-gradient-to-r from-amber-400 via-orange-500 to-yellow-400"></div>
+
+        <div class="p-5 sm:p-7">
+            <!-- Header row -->
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
+                <div class="flex items-center gap-3.5">
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 flex items-center justify-center text-white text-2xl sm:text-3xl shadow-lg shadow-orange-200 shrink-0"
+                         :class="!hasClaimed && !poolExhausted ? 'opay-gift-bounce opay-glow-pulse' : ''">
+                        🎁
+                    </div>
+                    <div>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Daily Check-In Reward</h3>
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-gradient-to-r from-orange-100 to-amber-100 text-orange-900 border border-orange-200/80 shadow-xs">
+                                🔥 <span x-text="'Day ' + streak + ' Streak'"></span>
+                            </span>
+                            <template x-if="!hasClaimed && !poolExhausted">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-500 text-white tracking-wider animate-pulse">
+                                    Claim Now
+                                </span>
+                            </template>
+                        </div>
+                        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Check in consecutively every 24 hours to earn free wallet balance rewards!</p>
+                    </div>
+                </div>
+
+                <!-- Reset Timer & Quota Status -->
+                <div class="flex flex-wrap items-center gap-2">
+                    <template x-if="maxClaims > 0">
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border"
+                              :class="poolExhausted ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-800 border-amber-200'">
+                            <span class="w-2 h-2 rounded-full" :class="poolExhausted ? 'bg-red-500' : 'bg-amber-500'"></span>
+                            <span x-text="poolExhausted ? 'Daily pool filled' : 'Pool: ' + todayClaims + '/' + maxClaims"></span>
+                        </span>
+                    </template>
+                    <div class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 text-slate-700">
+                        <svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <span>Resets: <strong class="font-mono text-slate-900" x-text="countdownDisplay"></strong></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Success notification -->
+            <div x-show="successMessage" x-transition class="mt-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">🎉</span>
+                    <span x-text="successMessage"></span>
+                </div>
+                <button type="button" @click="successMessage = ''" class="text-emerald-700 hover:text-emerald-900 text-xs font-bold underline cursor-pointer">Dismiss</button>
+            </div>
+
+            <!-- Error notification -->
+            <div x-show="errorMessage" x-transition class="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm font-semibold flex items-center justify-between shadow-xs">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">⚠️</span>
+                    <span x-text="errorMessage"></span>
+                </div>
+                <button type="button" @click="errorMessage = ''" class="text-red-700 hover:text-red-900 text-xs font-bold underline cursor-pointer">Dismiss</button>
+            </div>
+
+            <!-- Streak Progress Bar -->
+            <div class="mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50/70 to-orange-50/70 border border-amber-100">
+                <div class="flex items-center justify-between text-xs font-bold mb-1.5">
+                    <span class="text-amber-900 font-black">🔥 7-Day Rewards Ladder</span>
+                    <span class="text-orange-800" x-text="'Progress: Level ' + streak + ' of 7 (' + Math.round((streak / 7) * 100) + '%)'"></span>
+                </div>
+                <div class="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full opay-progress-shimmer transition-all duration-700 ease-out"
+                         :style="'width: ' + Math.min(100, Math.max(14, Math.round((streak / 7) * 100))) + '%'"></div>
+                </div>
+            </div>
+
+            <!-- 7-Day Interactive Ladder (Scrollable on small phones, 7-col grid on tablets/desktop) -->
+            <div class="mt-4">
+                <div class="flex sm:grid sm:grid-cols-4 lg:grid-cols-7 gap-2.5 overflow-x-auto pb-2 sm:pb-0 scrollbar-none">
+                    <template x-for="day in [1, 2, 3, 4, 5, 6, 7]" :key="day">
+                        <div class="min-w-[100px] sm:min-w-0 p-3 rounded-2xl border text-center transition-all duration-300 relative flex flex-col justify-between shrink-0"
+                             :class="{
+                                 'bg-emerald-50/80 border-emerald-300 ring-1 ring-emerald-200': (hasClaimed && day <= streak) || (!hasClaimed && day < streak),
+                                 'bg-gradient-to-b from-amber-50 to-orange-100 border-orange-400 ring-2 ring-orange-400 shadow-md transform sm:scale-105 opay-glow-pulse': (!hasClaimed && day === streak && !poolExhausted),
+                                 'bg-slate-50 border-slate-200 opacity-60': (day > streak) || (!hasClaimed && day === streak && poolExhausted)
+                             }">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-[11px] font-black"
+                                      :class="(hasClaimed && day <= streak) || (!hasClaimed && day < streak) ? 'text-emerald-800' : (day === streak ? 'text-orange-900 font-black' : 'text-slate-500')"
+                                      x-text="'Day ' + day">
+                                </span>
+                                <span class="text-xs" x-text="day === 1 ? '🌱' : (day === 2 ? '🌿' : (day === 3 ? '☘️' : (day === 4 ? '🌻' : (day === 5 ? '🌲' : (day === 6 ? '💎' : '👑')))))"></span>
+                            </div>
+
+                            <div class="py-1">
+                                <div class="text-2xl mb-0.5">
+                                    <span x-show="(hasClaimed && day <= streak) || (!hasClaimed && day < streak)">✅</span>
+                                    <span x-show="!hasClaimed && day === streak" class="opay-gift-bounce inline-block">🎁</span>
+                                    <span x-show="day > streak">🔒</span>
+                                </div>
+                                <div class="text-xs font-black text-slate-900 font-mono tracking-tight" x-text="getAmountForDay(day)"></div>
+                            </div>
+
+                            <div class="mt-1">
+                                <span x-show="(hasClaimed && day <= streak) || (!hasClaimed && day < streak)" class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded-md">Claimed</span>
+                                <span x-show="!hasClaimed && day === streak" class="text-[10px] font-black text-white bg-gradient-to-r from-orange-500 to-amber-500 px-2 py-0.5 rounded-full shadow-xs">CLAIM</span>
+                                <span x-show="day > streak" class="text-[10px] font-semibold text-slate-400">Locked</span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Action Button -->
+            <div class="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <div class="text-xs text-slate-500 text-center sm:text-left">
+                    <span class="font-bold text-slate-700">Streak Rule:</span> Check in every 24 hours to maximize your streak bonus.
+                </div>
+
+                <div class="w-full sm:w-auto">
+                    <template x-if="hasClaimed">
+                        <button type="button" disabled class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs sm:text-sm cursor-not-allowed flex items-center justify-center gap-2 border border-emerald-200">
+                            <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                            <span>Claimed for Today (Next in <span x-text="countdownDisplay"></span>)</span>
+                        </button>
+                    </template>
+
+                    <template x-if="!hasClaimed && poolExhausted">
+                        <button type="button" disabled class="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-slate-100 text-slate-500 font-bold text-xs sm:text-sm cursor-not-allowed flex items-center justify-center gap-2 border border-slate-200">
+                            <span>Today's Quota Reached</span>
+                        </button>
+                    </template>
+
+                    <template x-if="!hasClaimed && !poolExhausted">
+                        <button type="button" @click="claimGift()" :disabled="claiming"
+                                class="w-full sm:w-auto px-7 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white font-black text-xs sm:text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95 disabled:opacity-50 opay-glow-pulse cursor-pointer">
+                            <span x-show="claiming" class="inline-block animate-spin">⌛</span>
+                            <span x-show="!claiming" class="text-base">🎁</span>
+                            <span x-text="claiming ? 'Claiming Gift...' : 'Claim Day ' + streak + ' Reward (' + getAmountForDay(streak) + ')'"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Quick Activity Stats (3 Modern Cards) -->
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        
+        <!-- Stat 1: SMS Numbers -->
+        <a href="/sms-verify" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-teal-300 transition group">
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                📱
+            </div>
+            <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SMS Numbers</div>
+                <div class="text-2xl font-black text-slate-900 mt-0.5">{{ $smsNumbersCount ?? 0 }}</div>
+            </div>
+            <div class="ml-auto text-slate-300 group-hover:text-blue-500 transition">&rarr;</div>
+        </a>
+
+        <!-- Stat 2: Logs Purchased -->
+        <a href="/logs-store" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-300 transition group">
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                📄
+            </div>
+            <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Logs Purchased</div>
+                <div class="text-2xl font-black text-slate-900 mt-0.5">{{ $logsPurchasedCount ?? 0 }}</div>
+            </div>
+            <div class="ml-auto text-slate-300 group-hover:text-amber-500 transition">&rarr;</div>
+        </a>
+
+        <!-- Stat 3: Active Boosts -->
+        <a href="/social-boosting" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-purple-300 transition group">
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
+                🚀
+            </div>
+            <div>
+                <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Boosts</div>
+                <div class="text-2xl font-black text-slate-900 mt-0.5">{{ $boostsCount ?? 0 }}</div>
+            </div>
+            <div class="ml-auto text-slate-300 group-hover:text-purple-500 transition">&rarr;</div>
+        </a>
+    </div>
+
+    <!-- 5. OPay Carousel Promotional Banners -->
+    <div x-data="{
+            index: 0,
+            slides: [
+                {
+                    badge: 'Instant Delivery',
+                    title: 'Global SMS Numbers from $0.20',
+                    desc: 'Instant verification codes for WhatsApp, Telegram, TikTok, OpenAI, PayPal, and 200+ apps.',
+                    btnText: 'Get Number',
+                    btnHref: '/sms-verify',
+                    bg: 'from-[#0d9488] to-teal-800'
+                },
+                {
+                    badge: 'Restocked Daily',
+                    title: 'Verified Aged Digital Accounts',
+                    desc: 'Facebook, Twitter, Instagram, TikTok and Google accounts with full cookies and credentials.',
+                    btnText: 'Browse Logs',
+                    btnHref: '/logs-store',
+                    bg: 'from-amber-600 to-orange-700'
+                },
+                {
+                    badge: 'High Speed',
+                    title: 'Supercharge Your Social Reach',
+                    desc: 'Real followers, likes, views, and comments delivered instantly to scale your online brand.',
+                    btnText: 'Launch Boost',
+                    btnHref: '/social-boosting',
+                    bg: 'from-indigo-600 to-purple-800'
+                }
+            ],
+            next() { this.index = (this.index + 1) % this.slides.length; },
+            prev() { this.index = (this.index - 1 + this.slides.length) % this.slides.length; }
+         }"
+         x-init="setInterval(() => next(), 6000)"
+         class="relative rounded-3xl overflow-hidden shadow-md text-white">
+        
+        <template x-for="(s, i) in slides" :key="i">
+            <div x-show="index === i"
+                 x-transition:enter="transition ease-out duration-300"
+                 x-transition:enter-start="opacity-0 translate-x-4"
+                 x-transition:enter-end="opacity-100 translate-x-0"
+                 class="p-6 sm:p-8 bg-gradient-to-r flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6"
+                 :class="s.bg">
+                
+                <div class="max-w-xl">
+                    <span class="inline-block px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-black uppercase tracking-wider mb-2" x-text="s.badge"></span>
+                    <h3 class="text-xl sm:text-2xl font-black text-white tracking-tight" x-text="s.title"></h3>
+                    <p class="text-white/85 text-xs sm:text-sm mt-1 leading-relaxed" x-text="s.desc"></p>
+                </div>
+
+                <div class="flex items-center gap-3 shrink-0">
+                    <a :href="s.btnHref" class="px-5 py-2.5 rounded-2xl bg-white text-slate-900 font-black text-xs sm:text-sm shadow-md hover:bg-slate-100 transition active:scale-95" x-text="s.btnText"></a>
+                    <button type="button" @click="next()" class="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 flex items-center justify-center text-white" aria-label="Next promo">
+                        &rarr;
+                    </button>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- 6. Two-Column Row: OPay Currency Converter & Top Services -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6" id="exchange-calculator">
+        
+        <!-- Currency Converter (OPay Clean Exchange Tool) -->
+        <div class="lg:col-span-2 bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs"
+             x-data="{
+                rate: {{ (float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500) }},
+                usd: '',
+                ngn: '',
+                fromUsd() {
+                    const u = parseFloat(this.usd);
+                    this.ngn = isNaN(u) ? '' : (u * this.rate).toFixed(2);
+                },
+                fromNgn() {
+                    const n = parseFloat(this.ngn);
+                    this.usd = isNaN(n) ? '' : (n / this.rate).toFixed(2);
+                },
+                setUsd(val) {
+                    this.usd = val;
+                    this.fromUsd();
+                },
+                setNgn(val) {
+                    this.ngn = val;
+                    this.fromNgn();
+                }
+             }">
+            <div class="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div>
+                    <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                        Exchange Calculator
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Live conversion rate for wallet top-up and orders</p>
+                </div>
+                <div class="px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/60 text-emerald-800 text-xs font-black">
+                    1 USD = ₦{{ number_format((float) ($liveNgnPerUsd ?? $ngnPerUsd ?? 1500), 2) }}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+                <!-- USD Input -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 focus-within:border-[#0d9488] focus-within:bg-white transition">
+                    <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider">You Pay (USD)</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-lg font-black text-slate-400">$</span>
+                        <input type="number" step="0.01" min="0" x-model="usd" @input="fromUsd()" placeholder="0.00" class="w-full bg-transparent border-none p-0 text-xl font-mono font-black text-slate-900 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- NGN Input -->
+                <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 focus-within:border-[#0d9488] focus-within:bg-white transition">
+                    <label class="block text-[10px] font-black uppercase text-slate-400 tracking-wider">Equivalent (NGN)</label>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-lg font-black text-slate-400">₦</span>
+                        <input type="number" step="1" min="0" x-model="ngn" @input="fromNgn()" placeholder="0.00" class="w-full bg-transparent border-none p-0 text-xl font-mono font-black text-slate-900 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Preset Chips -->
+            <div class="flex flex-wrap items-center gap-2 mt-4">
+                <span class="text-xs font-bold text-slate-400">Presets:</span>
+                <button type="button" @click="setUsd(5)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">$5</button>
+                <button type="button" @click="setUsd(10)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">$10</button>
+                <button type="button" @click="setUsd(25)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">$25</button>
+                <button type="button" @click="setNgn(5000)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">₦5,000</button>
+                <button type="button" @click="setNgn(10000)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">₦10,000</button>
+                <button type="button" @click="setNgn(25000)" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-xs font-bold text-slate-700 transition cursor-pointer">₦25,000</button>
+                <button type="button" @click="usd=''; ngn='';" class="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-600 text-xs font-bold text-slate-500 transition cursor-pointer ml-auto">Clear</button>
+            </div>
+        </div>
+
+        <!-- Featured Fast Channels -->
+        <div class="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col justify-between">
+            <div>
+                <h3 class="text-sm font-black text-slate-900 uppercase tracking-wider mb-1">Payment Channels</h3>
+                <p class="text-xs text-slate-400">Multiple instant automated options</p>
+
+                <div class="mt-4 space-y-2.5">
+                    <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl">⚡</span>
+                            <div>
+                                <div class="text-xs font-black text-slate-800">Bank Transfer / PalmPay</div>
+                                <div class="text-[10px] text-slate-400">Monietude Automated Virtual Account</div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Instant</span>
+                    </div>
+
+                    <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-xl">🪙</span>
+                            <div>
+                                <div class="text-xs font-black text-slate-800">Cryptocurrency</div>
+                                <div class="text-[10px] text-slate-400">USDT, BTC, ETH, LTC via Cryptomus</div>
+                            </div>
+                        </div>
+                        <span class="text-[10px] font-black text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Automated</span>
+                    </div>
+                </div>
+            </div>
+
+            <a href="/funding" class="w-full mt-4 py-2.5 px-4 rounded-2xl bg-[#0d9488] hover:bg-teal-700 text-white font-black text-xs text-center shadow-xs transition active:scale-95">
+                Fund Wallet Balance &rarr;
+            </a>
+        </div>
+    </div>
+
+    <!-- 7. OPay Recent Transactions & Order Ledger -->
+    <div x-data="{ filter: 'all' }" class="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        
+        <!-- Header & Filter Pills -->
+        <div class="p-5 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+                <div class="flex items-center gap-2">
+                    <h3 class="text-base font-black text-slate-900 tracking-tight">Recent Transactions</h3>
+                    <span class="text-xs text-slate-400 font-bold">Activity</span>
+                </div>
+                <!-- Filter Pills -->
+                <div class="flex flex-wrap gap-1.5 mt-2.5">
+                    <button type="button" @click="filter = 'all'" :class="filter === 'all' ? 'bg-[#0d9488] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer">
+                        All
+                    </button>
+                    <button type="button" @click="filter = 'sms'" :class="filter === 'sms' ? 'bg-[#0d9488] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer">
+                        SMS
+                    </button>
+                    <button type="button" @click="filter = 'logs'" :class="filter === 'logs' ? 'bg-[#0d9488] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer">
+                        Logs
+                    </button>
+                    <button type="button" @click="filter = 'boost'" :class="filter === 'boost' ? 'bg-[#0d9488] text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'" class="px-3 py-1 rounded-full text-xs font-bold transition cursor-pointer">
+                        Boost
+                    </button>
+                </div>
+            </div>
+
+            <a href="/orders" class="inline-flex items-center gap-1 text-xs font-black text-[#0d9488] hover:underline shrink-0">
+                <span>View Full Order History</span>
+                <span>&rarr;</span>
+            </a>
+        </div>
+
+        <!-- Transaction List -->
         @if(isset($recentActivities) && $recentActivities->count() > 0)
-            <div class="divide-y divide-gray-100">
+            <div class="divide-y divide-slate-100">
                 @foreach($recentActivities as $activity)
-                    <div x-show="filter === 'all' || filter === @js($activity['type'])" class="p-5 sm:p-6 flex items-start justify-between gap-4" style="display:none;">
-                        <div class="flex items-start gap-4">
-                            <div class="w-10 h-10 rounded-lg flex items-center justify-center {{ $activity['type'] === 'sms' ? 'bg-blue-50 text-blue-600' : ($activity['type'] === 'boost' ? 'bg-purple-50 text-purple-600' : 'bg-yellow-50 text-yellow-700') }}">
+                    <div x-show="filter === 'all' || filter === @js($activity['type'])" 
+                         class="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50/70 transition">
+                        
+                        <div class="flex items-center gap-3.5 min-w-0">
+                            <!-- Category Icon Squircle -->
+                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-xs {{ $activity['type'] === 'sms' ? 'bg-blue-50 text-blue-600' : ($activity['type'] === 'boost' ? 'bg-purple-50 text-purple-600' : 'bg-amber-50 text-amber-700') }}">
                                 @if($activity['type'] === 'sms')
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"></path></svg>
+                                    📱
                                 @elseif($activity['type'] === 'boost')
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                                    🚀
                                 @else
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"></path></svg>
+                                    📄
                                 @endif
                             </div>
-                            <div>
-                                <div class="flex items-center gap-2">
-                                    <div class="font-bold text-gray-900">{{ $activity['title'] }}</div>
-                                    <span class="text-xs font-bold px-2 py-0.5 rounded-full {{ $activity['type'] === 'sms' ? 'bg-blue-50 text-blue-700' : ($activity['type'] === 'boost' ? 'bg-purple-50 text-purple-700' : 'bg-yellow-50 text-yellow-700') }}">
-                                        {{ strtoupper($activity['type']) }}
-                                    </span>
+
+                            <div class="min-w-0">
+                                <div class="text-sm font-black text-slate-900 truncate">
+                                    {{ $activity['title'] }}
                                 </div>
-                                <div class="text-sm text-gray-500 mt-1">
+                                <div class="text-xs text-slate-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
+                                    <span>{{ \Illuminate\Support\Carbon::parse($activity['created_at'])->format('M d, h:i A') }}</span>
+                                    <span>&bull;</span>
                                     @if(($activity['type'] ?? '') === 'sms')
-                                        {{ $activity['meta'] ?? '' }}
-                                    @elseif(isset($activity['meta_items'], $activity['meta_amount_usd']))
-                                        {{ $activity['meta_items'] }} • {{ $currencySymbol ?? '$' }}{{ ($formatAmount ?? fn($x) => number_format($x, 2))($activity['meta_amount_usd']) }}
-                                    @else
-                                        —
+                                        <span>{{ $activity['meta'] ?? 'Order' }}</span>
+                                    @elseif(isset($activity['meta_items']))
+                                        <span>{{ $activity['meta_items'] }} item(s)</span>
                                     @endif
                                 </div>
                             </div>
                         </div>
-                        <div class="text-right">
-                            <div class="text-xs font-bold text-gray-600">{{ \Illuminate\Support\Carbon::parse($activity['created_at'])->format('M d, Y H:i') }}</div>
-                            <div class="mt-1 text-xs font-bold px-2 py-1 rounded-lg inline-block bg-gray-50 text-gray-700">
-                                {{ $activity['status'] }}
+
+                        <!-- Right: Amount & Status Badge -->
+                        <div class="text-right shrink-0">
+                            @if(isset($activity['meta_amount_usd']))
+                                <div class="text-sm font-black text-slate-900 font-mono">
+                                    -{{ $currencySymbol ?? '$' }}{{ number_format(((float) $activity['meta_amount_usd']) * ($currencyFx ?? 1), 2) }}
+                                </div>
+                            @endif
+
+                            <div class="mt-1">
+                                @php
+                                    $st = strtolower((string) ($activity['status'] ?? ''));
+                                    $isSuccess = in_array($st, ['completed', 'finished', 'active', 'ok', 'success'], true);
+                                    $isPending = in_array($st, ['pending', 'processing', 'in_progress', 'waiting'], true);
+                                @endphp
+                                <span class="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full {{ $isSuccess ? 'bg-emerald-100 text-emerald-800' : ($isPending ? 'bg-amber-100 text-amber-800' : 'bg-slate-100 text-slate-700') }}">
+                                    {{ $activity['status'] }}
+                                </span>
                             </div>
                         </div>
                     </div>
                 @endforeach
             </div>
         @else
-            <div class="p-6 text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4 text-gray-400">
-                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+            <!-- OPay Clean Empty State -->
+            <div class="p-8 text-center">
+                <div class="w-16 h-16 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-2xl text-slate-400 mb-3">
+                    📋
                 </div>
-                <h4 class="text-gray-900 font-medium">No recent orders found</h4>
-                <p class="text-gray-500 text-sm mt-1 mb-4">You haven't made any purchases yet.</p>
-                <a href="/sms-verify" class="inline-block bg-gray-900 text-white px-5 py-2 rounded-lg font-medium text-sm hover:bg-gray-800 transition">Get a Number</a>
+                <h4 class="text-sm font-black text-slate-800">No Transactions Yet</h4>
+                <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Get started by topping up your balance or grabbing an instant SMS number.</p>
+                <div class="mt-4 flex items-center justify-center gap-2">
+                    <a href="/funding" class="px-4 py-2 rounded-xl bg-[#0d9488] text-white text-xs font-black shadow-xs">Add Funds</a>
+                    <a href="/sms-verify" class="px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold hover:bg-slate-200">Get a Number</a>
+                </div>
             </div>
         @endif
     </div>
 
-    <!-- Quick Shortcuts -->
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div class="px-6 py-5 border-b border-gray-100">
-            <h3 class="text-lg font-bold text-gray-800">Top Services</h3>
-        </div>
-        <div class="p-4">
-            <a href="/social-boosting" class="flex items-center p-3 hover:bg-gray-50 rounded-xl transition group">
-                <div class="w-10 h-10 rounded-lg bg-pink-50 flex items-center justify-center text-pink-500 mr-4 group-hover:scale-110 transition-transform">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
-                </div>
-                <div>
-                    <h4 class="text-gray-900 font-medium">Instagram Followers</h4>
-                    <p class="text-xs text-gray-500">From $1.20/1k</p>
-                </div>
-            </a>
-            
-            <a href="/logs-store" class="flex items-center p-3 hover:bg-gray-50 rounded-xl transition group mt-2">
-                <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-500 mr-4 group-hover:scale-110 transition-transform">
-                    <svg class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-                </div>
-                <div>
-                    <h4 class="text-gray-900 font-medium">Facebook Aged Accounts</h4>
-                    <p class="text-xs text-gray-500">Marketplace active logs</p>
-                </div>
-            </a>
-
-            <a href="/sms-verify" class="flex items-center p-3 hover:bg-gray-50 rounded-xl transition group mt-2">
-                <div class="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center text-green-500 mr-4 group-hover:scale-110 transition-transform">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8h2a2 2 0 012 2v6a2 2 0 01-2 2h-2v4l-4-4H9a1.994 1.994 0 01-1.414-.586m0 0L11 14h4a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2v4l.586-.586z"></path></svg>
-                </div>
-                <div>
-                    <h4 class="text-gray-900 font-medium">WhatsApp Verification</h4>
-                    <p class="text-xs text-gray-500">Global numbers available</p>
-                </div>
-            </a>
-        </div>
-    </div>
 </div>
+
+<!-- Daily Login Gift Javascript Component -->
+<script>
+function dailyGiftComponent() {
+    return {
+        loading: true,
+        claiming: false,
+        enabled: false,
+        hasClaimed: false,
+        streak: 1,
+        todayAmount: null,
+        maxClaims: 0,
+        todayClaims: 0,
+        poolExhausted: false,
+        remainingPool: null,
+        type: 'streak',
+        fixedAmount: 0.05,
+        minAmount: 0.02,
+        maxAmount: 0.10,
+        streakAmounts: {},
+        secondsLeft: 0,
+        timerInterval: null,
+        successMessage: '',
+        errorMessage: '',
+
+        get countdownDisplay() {
+            if (this.secondsLeft <= 0) return '00:00:00';
+            const h = Math.floor(this.secondsLeft / 3600).toString().padStart(2, '0');
+            const m = Math.floor((this.secondsLeft % 3600) / 60).toString().padStart(2, '0');
+            const s = (this.secondsLeft % 60).toString().padStart(2, '0');
+            return `${h}h ${m}m ${s}s`;
+        },
+
+        init() {
+            this.fetchStatus();
+        },
+
+        async fetchStatus() {
+            this.loading = true;
+            try {
+                const res = await fetch('/api/daily-gift/status', {
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    this.enabled = !!data.enabled;
+                    this.hasClaimed = !!data.has_claimed_today;
+                    this.streak = data.streak || 1;
+                    this.todayAmount = data.today_claimed_amount;
+                    this.maxClaims = data.max_claims_per_day || 0;
+                    this.todayClaims = data.today_claims_count || 0;
+                    this.poolExhausted = !!data.pool_exhausted;
+                    this.remainingPool = data.remaining_pool;
+                    this.type = data.type || 'streak';
+                    this.fixedAmount = data.fixed_amount || 0.05;
+                    this.minAmount = data.min_amount || 0.02;
+                    this.maxAmount = data.max_amount || 0.10;
+                    this.streakAmounts = data.streak_amounts || {};
+                    this.secondsLeft = data.seconds_until_reset || 0;
+
+                    this.startCountdown();
+                }
+            } catch (err) {
+                console.error('Failed to load daily gift status:', err);
+            } finally {
+                this.loading = false;
+            }
+        },
+
+        startCountdown() {
+            if (this.timerInterval) clearInterval(this.timerInterval);
+            if (this.secondsLeft > 0) {
+                this.timerInterval = setInterval(() => {
+                    if (this.secondsLeft > 0) {
+                        this.secondsLeft--;
+                    } else {
+                        clearInterval(this.timerInterval);
+                        this.fetchStatus();
+                    }
+                }, 1000);
+            }
+        },
+
+        getAmountForDay(day) {
+            if (this.type === 'fixed') {
+                return '$' + Number(this.fixedAmount).toFixed(2);
+            }
+            if (this.type === 'random') {
+                return '$' + Number(this.minAmount).toFixed(2) + ' - $' + Number(this.maxAmount).toFixed(2);
+            }
+            return '$' + Number(this.streakAmounts[day] || 0.05).toFixed(2);
+        },
+
+        async claimGift() {
+            if (this.claiming || this.hasClaimed || this.poolExhausted) return;
+            this.claiming = true;
+            this.errorMessage = '';
+            this.successMessage = '';
+
+            try {
+                const tokenMeta = document.querySelector('meta[name="csrf-token"]');
+                const token = tokenMeta ? tokenMeta.getAttribute('content') : '';
+                const res = await fetch('/api/daily-gift/claim', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'X-CSRF-TOKEN': token
+                    }
+                });
+
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    this.hasClaimed = true;
+                    this.streak = data.streak;
+                    this.todayAmount = data.amount;
+                    this.successMessage = data.message;
+                    
+                    this.fetchStatus();
+                } else {
+                    this.errorMessage = data.message || 'Failed to claim daily gift. Please try again.';
+                    if (res.status === 400 && data.message && data.message.toLowerCase().includes('limit')) {
+                        this.poolExhausted = true;
+                    }
+                }
+            } catch (err) {
+                this.errorMessage = 'Network error while claiming your gift. Please try again.';
+            } finally {
+                this.claiming = false;
+            }
+        }
+    };
+}
+</script>
 @endsection

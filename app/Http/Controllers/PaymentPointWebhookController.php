@@ -55,12 +55,25 @@ class PaymentPointWebhookController extends Controller
         if ($reference) {
             $tx = FundingTransaction::where('reference', (string) $reference)->first();
         }
-        if (!$tx && $receiverAccountNumber) {
-            $tx = FundingTransaction::where('provider', 'paymentpoint')
-                ->where('provider_payment_id', (string) $receiverAccountNumber)
-                ->whereIn('status', ['pending', 'waiting_payment'])
-                ->latest()
-                ->first();
+        if (! $tx && $receiverAccountNumber) {
+            $user = \App\Models\User::where('paymentpoint_account_number', (string) $receiverAccountNumber)->first();
+            if ($user) {
+                $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
+                $amountNgn = (float) ($data['amount_paid'] ?? $data['amount'] ?? $data['amountNgn'] ?? 0);
+                $ref = 'PP-' . strtoupper(\Illuminate\Support\Str::random(10));
+                $tx = FundingTransaction::create([
+                    'user_id' => $user->id,
+                    'payment_method' => 'paymentpoint',
+                    'provider' => 'paymentpoint',
+                    'provider_payment_id' => (string) ($providerPaymentId ?: $receiverAccountNumber),
+                    'currency' => 'NGN',
+                    'amount' => round($amountNgn, 2),
+                    'amount_usd' => $ngnPerUsd > 0 ? round($amountNgn / $ngnPerUsd, 8) : 0,
+                    'rate_ngn_per_usd' => $ngnPerUsd,
+                    'reference' => $ref,
+                    'status' => 'pending',
+                ]);
+            }
         }
 
         if (! $tx) {
@@ -113,16 +126,15 @@ class PaymentPointWebhookController extends Controller
             }
 
             $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
-            $amountNgn = (float) ($data['amount'] ?? $data['amountNgn'] ?? $data['ngnAmount'] ?? $data['amount_paid'] ?? 0);
+            $amountNgn = (float) ($data['amount_paid'] ?? $data['amount'] ?? $data['amountNgn'] ?? $data['ngnAmount'] ?? 0);
             if ($amountNgn === 0) {
                 $amountKobo = (float) ($data['amountKobo'] ?? $data['koboAmount'] ?? $data['kobo'] ?? 0);
                 $amountNgn = $amountKobo / 100;
             }
-            $amountUsd = $ngnPerUsd > 0 ? ($amountNgn / $ngnPerUsd) : 0;
-
-            if ($amountUsd > 0) {
+            if ($amountNgn > 0) {
+                $calc = FundingTransaction::calculateNetAndFee($amountNgn, 'paymentpoint', $ngnPerUsd);
                 $lockedTx->amount = round($amountNgn, 2);
-                $lockedTx->amount_usd = round($amountUsd, 2);
+                $lockedTx->amount_usd = $calc['net_usd'];
                 $lockedTx->currency = 'NGN';
                 $lockedTx->rate_ngn_per_usd = $ngnPerUsd;
                 $lockedTx->save();
@@ -134,6 +146,8 @@ class PaymentPointWebhookController extends Controller
                 'payment_method' => (string) $lockedTx->payment_method,
                 'provider' => 'paymentpoint',
                 'provider_payment_id' => (string) ($lockedTx->provider_payment_id ?? ''),
+                'gross_ngn' => $amountNgn,
+                'charge_percent' => FundingTransaction::getChargePercent('paymentpoint'),
             ]);
 
             $lockedTx->status = 'approved';

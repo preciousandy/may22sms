@@ -16,5 +16,6 @@ class VerifyCsrfToken extends Middleware
         'api/strollwallet/webhook',
         'api/nowpayments/ipn',
         'api/pocketfi/webhook',
+        'api/monietude/webhook',
     ];
 }

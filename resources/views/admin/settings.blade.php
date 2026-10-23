@@ -376,6 +376,49 @@
                             </label>
                         </div>
                     </div>
+
+                    <!-- Monietude Virtual Accounts -->
+                    <div class="p-4 rounded-xl border-2 border-teal-100 bg-teal-50/50 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="font-bold text-gray-800 flex items-center gap-2">
+                                    <span>Monietude Virtual Accounts</span>
+                                    <span class="text-[10px] bg-teal-100 text-teal-800 font-bold px-2 py-0.5 rounded-full">PalmPay</span>
+                                </p>
+                                <p class="text-xs text-gray-500">Dedicated automated virtual account funding (PalmPay / Flutterwave) via Monietude API.</p>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <span class="text-xs font-bold px-2 py-1 rounded-full {{ ($monietudeEnabled ?? true) ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-200 text-gray-700' }}">
+                                    {{ ($monietudeEnabled ?? true) ? 'ENABLED' : 'DISABLED' }}
+                                </span>
+                                <input type="hidden" name="payment_method_monietude_enabled" value="0">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" class="sr-only peer" name="payment_method_monietude_enabled" value="1" {{ ($monietudeEnabled ?? true) ? 'checked' : '' }}>
+                                    <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#0d9488] transition"></div>
+                                    <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-teal-100">
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Monietude API Key</label>
+                                <input type="password" name="monietude_api_key" value="{{ $monietudeApiKey ?? '' }}" class="w-full text-sm font-mono rounded-lg border-gray-300 focus:border-[#0d9488] focus:ring-[#0d9488]" placeholder="mk_...">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-gray-700 mb-1">Default Provider</label>
+                                <select name="monietude_provider" class="w-full text-sm rounded-lg border-gray-300 focus:border-[#0d9488] focus:ring-[#0d9488]">
+                                    <option value="palmpay" {{ ($monietudeProvider ?? 'palmpay') === 'palmpay' ? 'selected' : '' }}>PalmPay (Dedicated Virtual Accounts)</option>
+                                    <option value="flutterwave" {{ ($monietudeProvider ?? '') === 'flutterwave' ? 'selected' : '' }}>Flutterwave</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="bg-white/80 rounded-lg p-3 border border-teal-100 flex items-center justify-between text-xs">
+                            <span class="text-gray-600 font-medium">Webhook URL: <code class="text-teal-700 font-mono select-all">{{ url('/api/monietude/webhook') }}</code></span>
+                            <span class="text-[10px] text-gray-400">Add this in your Monietude dashboard</span>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="pt-4 border-t border-gray-100 mt-6">
@@ -478,6 +521,170 @@
         </div>
     </div>
 
+    <!-- Daily Login Gift 🎁 Settings -->
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden md:col-span-2" x-data="{ giftMode: '{{ old('daily_gift_type', $dailyGiftType) }}' }">
+        <div class="px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-amber-50 to-orange-50 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <span class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center text-xl shadow-inner">🎁</span>
+                <div>
+                    <h3 class="text-lg font-bold text-gray-800">Daily Login Gift & Rewards</h3>
+                    <p class="text-xs text-gray-500">Reward users with daily wallet credits, streak incentives, and claim quotas.</p>
+                </div>
+            </div>
+            <!-- Live stats pills -->
+            <div class="flex items-center gap-3">
+                <div class="px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-xs font-semibold text-gray-700 shadow-sm flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span>Today: <strong class="text-gray-900">{{ $dailyGiftTodayClaims }}</strong>{{ $dailyGiftMaxClaimsPerDay > 0 ? ' / ' . $dailyGiftMaxClaimsPerDay : ' claimed' }}</span>
+                </div>
+                <div class="px-3 py-1.5 rounded-xl bg-white border border-amber-200 text-xs font-semibold text-gray-700 shadow-sm">
+                    Total Disbursed: <strong class="text-emerald-600">${{ number_format($dailyGiftTotalClaimedAmount, 2) }}</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="p-6">
+            <form action="/admin/settings" method="POST" class="space-y-6">
+                @csrf
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Feature Toggle -->
+                    <div class="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50">
+                        <div>
+                            <p class="font-bold text-gray-800">Enable Daily Gift</p>
+                            <p class="text-xs text-gray-500">Shows the daily claim box on user dashboards.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <input type="hidden" name="daily_gift_enabled" value="0">
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" class="sr-only peer" name="daily_gift_enabled" value="1" {{ old('daily_gift_enabled', ($dailyGiftEnabled ?? true) ? '1' : '0') === '1' ? 'checked' : '' }}>
+                                <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-[#0d9488] transition"></div>
+                                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition peer-checked:translate-x-5"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Max Claims Quota -->
+                    <div class="p-4 rounded-xl border border-gray-100 bg-gray-50">
+                        <div class="flex items-center justify-between mb-2">
+                            <label class="font-bold text-gray-800 text-sm" for="daily_gift_max_claims_per_day">Daily User Claim Quota</label>
+                            <span class="text-xs font-bold text-[#0d9488] bg-teal-50 px-2 py-0.5 rounded border border-teal-100">0 = Unlimited</span>
+                        </div>
+                        <div class="relative">
+                            <input type="number" id="daily_gift_max_claims_per_day" name="daily_gift_max_claims_per_day" min="0" step="1" 
+                                   value="{{ old('daily_gift_max_claims_per_day', $dailyGiftMaxClaimsPerDay) }}" 
+                                   class="w-full rounded-xl border-gray-300 focus:border-[#0d9488] focus:ring focus:ring-teal-200 focus:ring-opacity-50 text-sm font-semibold"
+                                   placeholder="e.g. 50 (limits to 50 users per day)">
+                        </div>
+                        <p class="mt-1.5 text-xs text-gray-500">Limits how many unique users can claim per day. Once reached, further claims are paused until midnight UTC.</p>
+                    </div>
+                </div>
+
+                <!-- Reward Distribution Mode -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-800 mb-2">Reward Distribution Mode</label>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label class="cursor-pointer border rounded-xl p-4 transition flex flex-col justify-between"
+                               :class="giftMode === 'streak' ? 'border-[#0d9488] bg-teal-50/40 shadow-sm ring-1 ring-[#0d9488]' : 'border-gray-200 hover:border-gray-300 bg-white'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-gray-800">🔥 7-Day Streak</span>
+                                <input type="radio" name="daily_gift_type" value="streak" x-model="giftMode" class="text-[#0d9488] focus:ring-[#0d9488]">
+                            </div>
+                            <span class="text-xs text-gray-500">Rewards increment each consecutive day user logs in (Day 1 to 7). Resets if a day is missed.</span>
+                        </label>
+
+                        <label class="cursor-pointer border rounded-xl p-4 transition flex flex-col justify-between"
+                               :class="giftMode === 'fixed' ? 'border-[#0d9488] bg-teal-50/40 shadow-sm ring-1 ring-[#0d9488]' : 'border-gray-200 hover:border-gray-300 bg-white'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-gray-800">💵 Fixed Amount</span>
+                                <input type="radio" name="daily_gift_type" value="fixed" x-model="giftMode" class="text-[#0d9488] focus:ring-[#0d9488]">
+                            </div>
+                            <span class="text-xs text-gray-500">Every user receives the exact same fixed amount every day they claim.</span>
+                        </label>
+
+                        <label class="cursor-pointer border rounded-xl p-4 transition flex flex-col justify-between"
+                               :class="giftMode === 'random' ? 'border-[#0d9488] bg-teal-50/40 shadow-sm ring-1 ring-[#0d9488]' : 'border-gray-200 hover:border-gray-300 bg-white'">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-sm text-gray-800">🎲 Mystery / Random</span>
+                                <input type="radio" name="daily_gift_type" value="random" x-model="giftMode" class="text-[#0d9488] focus:ring-[#0d9488]">
+                            </div>
+                            <span class="text-xs text-gray-500">Random amount generated within a specified min and max USD range.</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Mode Specific Inputs -->
+                <!-- Streak Mode Settings -->
+                <div x-show="giftMode === 'streak'" x-cloak class="p-5 rounded-xl border border-teal-100 bg-teal-50/30 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-gray-800">Consecutive Streak Daily Payouts ($ USD)</h4>
+                        <span class="text-xs text-teal-700 font-medium">Auto-cycles back to Day 1 after Day 7</span>
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-3">
+                        @for($d = 1; $d <= 7; $d++)
+                            <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-xs">
+                                <div class="text-xs font-bold text-gray-600 mb-1 flex items-center justify-between">
+                                    <span>Day {{ $d }}</span>
+                                    @if($d === 7) <span class="text-amber-500 text-xs">⭐</span> @endif
+                                </div>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-2 flex items-center text-gray-400 text-xs font-bold">$</span>
+                                    <input type="number" step="0.001" min="0.001" 
+                                           name="daily_gift_streak_amounts[{{ $d }}]" 
+                                           value="{{ old('daily_gift_streak_amounts.' . $d, $dailyGiftStreakAmounts[$d] ?? 0.05) }}"
+                                           class="w-full pl-5 pr-2 py-1.5 text-xs font-semibold rounded-lg border-gray-300 focus:border-[#0d9488] focus:ring-0">
+                                </div>
+                            </div>
+                        @endfor
+                    </div>
+                </div>
+
+                <!-- Fixed Mode Settings -->
+                <div x-show="giftMode === 'fixed'" x-cloak class="p-5 rounded-xl border border-gray-200 bg-gray-50 space-y-3">
+                    <label class="block text-sm font-bold text-gray-800">Fixed Reward Amount ($ USD)</label>
+                    <div class="relative max-w-xs">
+                        <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
+                        <input type="number" step="0.001" min="0.001" name="daily_gift_fixed_amount" 
+                               value="{{ old('daily_gift_fixed_amount', $dailyGiftFixedAmount) }}"
+                               class="w-full pl-8 pr-4 py-2.5 rounded-xl border-gray-300 focus:border-[#0d9488] focus:ring-0 font-bold text-gray-800 text-sm">
+                    </div>
+                </div>
+
+                <!-- Random Mode Settings -->
+                <div x-show="giftMode === 'random'" x-cloak class="p-5 rounded-xl border border-gray-200 bg-gray-50 space-y-3">
+                    <label class="block text-sm font-bold text-gray-800">Random Mystery Range ($ USD)</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                        <div>
+                            <span class="block text-xs font-semibold text-gray-600 mb-1">Minimum Amount</span>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
+                                <input type="number" step="0.001" min="0.001" name="daily_gift_min_amount" 
+                                       value="{{ old('daily_gift_min_amount', $dailyGiftMinAmount) }}"
+                                       class="w-full pl-8 pr-4 py-2.5 rounded-xl border-gray-300 focus:border-[#0d9488] focus:ring-0 font-bold text-gray-800 text-sm">
+                            </div>
+                        </div>
+                        <div>
+                            <span class="block text-xs font-semibold text-gray-600 mb-1">Maximum Amount</span>
+                            <div class="relative">
+                                <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400 font-bold">$</span>
+                                <input type="number" step="0.001" min="0.001" name="daily_gift_max_amount" 
+                                       value="{{ old('daily_gift_max_amount', $dailyGiftMaxAmount) }}"
+                                       class="w-full pl-8 pr-4 py-2.5 rounded-xl border-gray-300 focus:border-[#0d9488] focus:ring-0 font-bold text-gray-800 text-sm">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4 border-t border-gray-100 flex justify-end">
+                    <button type="submit" class="bg-[#0d9488] hover:bg-[#0f766e] text-white px-8 py-3 rounded-xl font-bold shadow-md transition flex items-center gap-2">
+                        <span>Save Daily Gift Settings</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="px-6 py-5 border-b border-gray-100 bg-gray-50">
             <h3 class="text-lg font-bold text-gray-800">Maintenance & Health</h3>
@@ -491,6 +698,7 @@
                     <div>QUEUE: <span class="font-bold text-gray-900">{{ $health['queue_connection'] ?? '' }}</span></div>
                     <div>CACHE: <span class="font-bold text-gray-900">{{ $health['cache_driver'] ?? '' }}</span></div>
                     <div>STORAGE WRITABLE: <span class="font-bold text-gray-900">{{ ($health['storage_writable'] ?? false) ? 'yes' : 'no' }}</span></div>
+                    <div>STORAGE LINKED: <span class="font-bold {{ ($health['storage_linked'] ?? false) ? 'text-emerald-600' : 'text-amber-600' }}">{{ ($health['storage_linked'] ?? false) ? 'yes (linked)' : 'no (not linked)' }}</span></div>
                 </div>
             </div>
 
@@ -512,6 +720,14 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <form action="/admin/settings/maintenance" method="POST" class="col-span-1 md:col-span-2">
+                    @csrf
+                    <input type="hidden" name="action" value="storage_link">
+                    <button type="submit" class="w-full bg-[#0d9488] hover:bg-[#0f766e] text-white px-4 py-2.5 rounded-lg text-sm font-bold shadow-sm transition flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+                        <span>Create Storage Link (storage:link)</span>
+                    </button>
+                </form>
                 <form action="/admin/settings/maintenance" method="POST">
                     @csrf
                     <input type="hidden" name="action" value="optimize_clear">

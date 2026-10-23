@@ -81,4 +81,51 @@ class DaisySmsServiceTest extends TestCase
 
         $this->assertEquals('CANCELED', $result['status']);
     }
+
+    public function test_cloudflare_challenge_handled_gracefully()
+    {
+        $cfHtml = '<!DOCTYPE html><html><head><title>Just a moment...</title></head><body><script src="https://challenges.cloudflare.com"></script></body></html>';
+
+        Http::fake([
+            'https://daisysms.io/stubs/handler_api.php*' => Http::response($cfHtml, 403),
+        ]);
+
+        $service = new DaisySmsService();
+
+        $pricesUsa = $service->getPrices('usa');
+        $this->assertNotEmpty($pricesUsa);
+        $this->assertArrayHasKey('usa', $pricesUsa);
+
+        $pricesUnknown = $service->getPrices('unknown_country');
+        $this->assertEquals([], $pricesUnknown);
+
+        $balance = $service->getBalance();
+        $this->assertArrayHasKey('error', $balance);
+        $this->assertStringContainsString('Cloudflare', $balance['error']);
+
+        $buy = $service->buyNumber('usa', 'any', 'whatsapp');
+        $this->assertArrayHasKey('error', $buy);
+        $this->assertStringContainsString('Cloudflare', $buy['error']);
+    }
+
+    public function test_flaresolverr_integration()
+    {
+        config(['services.daisysms.flaresolverr_url' => 'http://localhost:8191/v1']);
+
+        Http::fake([
+            'http://localhost:8191/v1' => Http::response([
+                'status' => 'ok',
+                'solution' => [
+                    'response' => 'ACCESS_BALANCE:12.34',
+                    'headers' => ['content-type' => 'text/plain'],
+                    'status' => 200,
+                ]
+            ], 200),
+        ]);
+
+        $service = new DaisySmsService();
+        $balance = $service->getBalance();
+
+        $this->assertEquals(12.34, $balance['balance']);
+    }
 }

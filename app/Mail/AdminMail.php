@@ -32,7 +32,7 @@ class AdminMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            markdown: 'emails.admin-mail',
+            view: 'emails.admin-mail',
         );
     }
 }

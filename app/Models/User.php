@@ -41,6 +41,10 @@ class User extends Authenticatable
         'strollwallet_account_number',
         'strollwallet_account_name',
         'strollwallet_bank_name',
+        'monietude_account_number',
+        'monietude_account_name',
+        'monietude_bank_name',
+        'monietude_provider',
     ];
 
     /**
@@ -94,5 +98,15 @@ class User extends Authenticatable
         return $this->belongsToMany(SportyBetCode::class)
             ->withPivot('amount_paid')
             ->withTimestamps();
+    }
+
+    public function savingsPlans()
+    {
+        return $this->hasMany(SavingsPlan::class);
+    }
+
+    public function savingsContributions()
+    {
+        return $this->hasMany(SavingsContribution::class);
     }
 }

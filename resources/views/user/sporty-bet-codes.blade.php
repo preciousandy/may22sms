@@ -81,7 +81,7 @@
 
                     @if(!$isPurchased)
                         <div class="mt-4 pt-4 border-t border-gray-200">
-                            <form action="/sporty-bet-codes/{{ $code->id }}/purchase" method="POST">
+                            <form action="/sporty-bet-codes/{{ $code->id }}/purchase" method="POST" data-loader="true" data-loader-title="Purchasing Code..." data-loader-subtitle="Unlocking booking code">
                                 @csrf
                                 <button type="submit" class="w-full py-3 rounded-xl font-bold text-white transition shadow-lg {{ $isFree ? 'bg-blue-600 hover:bg-blue-700' : 'bg-[#0d9488] hover:bg-[#0a7d73]' }}">
                                     {{ $isFree ? 'Get Free Code' : 'Purchase Code' }}

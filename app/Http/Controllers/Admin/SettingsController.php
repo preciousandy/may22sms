@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\DailyLoginGift;
 use App\Models\Setting;
 use App\Models\SmsCountry;
 use App\Services\FiveSimService;
@@ -26,6 +27,9 @@ class SettingsController extends Controller
         $strollwalletEnabled = (int) (Setting::where('key', 'payment_method_strollwallet_enabled')->value('value') ?? 1) === 1;
         $cryptoEnabled = (int) (Setting::where('key', 'payment_method_crypto_enabled')->value('value') ?? 1) === 1;
         $pocketfiEnabled = (int) (Setting::where('key', 'payment_method_pocketfi_enabled')->value('value') ?? 1) === 1;
+        $monietudeEnabled = (int) (Setting::where('key', 'payment_method_monietude_enabled')->value('value') ?? 1) === 1;
+        $monietudeApiKey = (string) (Setting::where('key', 'monietude_api_key')->value('value') ?? config('services.monietude.api_key', ''));
+        $monietudeProvider = (string) (Setting::where('key', 'monietude_provider')->value('value') ?? config('services.monietude.provider', 'palmpay'));
         $smsProvider = (string) (Setting::where('key', 'sms_provider')->value('value') ?? 'herosms');
         $herosmsEnabled = (int) (Setting::where('key', 'sms_provider_herosms_enabled')->value('value') ?? 1) === 1;
         $daisysmsEnabled = (int) (Setting::where('key', 'sms_provider_daisysms_enabled')->value('value') ?? 1) === 1;
@@ -88,6 +92,30 @@ class SettingsController extends Controller
             }
         }
 
+        // Daily Login Gift Settings & Stats
+        $dailyGiftEnabled = (int) (Setting::where('key', 'daily_gift_enabled')->value('value') ?? 1) === 1;
+        $dailyGiftMaxClaimsPerDay = (int) (Setting::where('key', 'daily_gift_max_claims_per_day')->value('value') ?? 0);
+        $dailyGiftType = (string) (Setting::where('key', 'daily_gift_type')->value('value') ?? 'streak');
+        $dailyGiftFixedAmount = (float) (Setting::where('key', 'daily_gift_fixed_amount')->value('value') ?? 0.05);
+        $dailyGiftMinAmount = (float) (Setting::where('key', 'daily_gift_min_amount')->value('value') ?? 0.02);
+        $dailyGiftMaxAmount = (float) (Setting::where('key', 'daily_gift_max_amount')->value('value') ?? 0.10);
+        
+        $rawStreakAmounts = Setting::where('key', 'daily_gift_streak_amounts')->value('value');
+        $defaultStreakAmounts = [1 => 0.02, 2 => 0.04, 3 => 0.06, 4 => 0.08, 5 => 0.10, 6 => 0.15, 7 => 0.25];
+        $dailyGiftStreakAmounts = $defaultStreakAmounts;
+        if ($rawStreakAmounts) {
+            $decoded = json_decode($rawStreakAmounts, true);
+            if (is_array($decoded)) {
+                for ($i = 1; $i <= 7; $i++) {
+                    $dailyGiftStreakAmounts[$i] = isset($decoded[$i]) ? (float) $decoded[$i] : $defaultStreakAmounts[$i];
+                }
+            }
+        }
+
+        $dailyGiftTotalClaims = DailyLoginGift::count();
+        $dailyGiftTotalClaimedAmount = (float) DailyLoginGift::sum('amount_usd');
+        $dailyGiftTodayClaims = DailyLoginGift::getTodayClaimsCount();
+
         $maintenanceEnabled = app()->isDownForMaintenance();
         $health = [
             'app_env' => (string) config('app.env'),
@@ -95,6 +123,7 @@ class SettingsController extends Controller
             'queue_connection' => (string) config('queue.default'),
             'cache_driver' => (string) config('cache.default'),
             'storage_writable' => is_writable(storage_path()),
+            'storage_linked' => file_exists(public_path('storage')) || is_link(public_path('storage')),
         ];
 
         return view('admin.settings', compact(
@@ -108,6 +137,9 @@ class SettingsController extends Controller
             'strollwalletEnabled',
             'cryptoEnabled',
             'pocketfiEnabled',
+            'monietudeEnabled',
+            'monietudeApiKey',
+            'monietudeProvider',
             'smsProvider',
             'herosmsEnabled',
             'daisysmsEnabled',
@@ -138,7 +170,17 @@ class SettingsController extends Controller
             'seoOgImage',
             'seoOgTitle',
             'seoOgDescription',
-            'seoTwitterCard'
+            'seoTwitterCard',
+            'dailyGiftEnabled',
+            'dailyGiftMaxClaimsPerDay',
+            'dailyGiftType',
+            'dailyGiftFixedAmount',
+            'dailyGiftMinAmount',
+            'dailyGiftMaxAmount',
+            'dailyGiftStreakAmounts',
+            'dailyGiftTotalClaims',
+            'dailyGiftTotalClaimedAmount',
+            'dailyGiftTodayClaims'
         ));
     }
 
@@ -160,6 +202,9 @@ class SettingsController extends Controller
             'payment_method_strollwallet_enabled' => 'nullable|in:0,1',
             'payment_method_crypto_enabled' => 'nullable|in:0,1',
             'payment_method_pocketfi_enabled' => 'nullable|in:0,1',
+            'payment_method_monietude_enabled' => 'nullable|in:0,1',
+            'monietude_api_key' => 'nullable|string|max:255',
+            'monietude_provider' => 'nullable|string|max:50',
             'site_name' => 'nullable|string|max:80',
             'site_logo_url' => 'nullable|string|max:500',
             'home_hero_title' => 'nullable|string|max:200',
@@ -184,6 +229,15 @@ class SettingsController extends Controller
             'seo_og_title' => 'nullable|string|max:60',
             'seo_og_description' => 'nullable|string|max:160',
             'seo_twitter_card' => 'nullable|in:summary,summary_large_image,app,player',
+            // Daily Login Gift
+            'daily_gift_enabled' => 'nullable|in:0,1',
+            'daily_gift_max_claims_per_day' => 'nullable|integer|min:0',
+            'daily_gift_type' => 'nullable|in:streak,fixed,random',
+            'daily_gift_fixed_amount' => 'nullable|numeric|min:0.001',
+            'daily_gift_min_amount' => 'nullable|numeric|min:0.001',
+            'daily_gift_max_amount' => 'nullable|numeric|min:0.001',
+            'daily_gift_streak_amounts' => 'nullable|array',
+            'daily_gift_streak_amounts.*' => 'nullable|numeric|min:0.001',
         ]);
 
         if ($request->filled('sms_provider')) {
@@ -287,6 +341,27 @@ class SettingsController extends Controller
             Setting::updateOrCreate(
                 ['key' => 'payment_method_pocketfi_enabled'],
                 ['value' => (string) ((int) $request->payment_method_pocketfi_enabled)]
+            );
+        }
+
+        if ($request->has('payment_method_monietude_enabled')) {
+            Setting::updateOrCreate(
+                ['key' => 'payment_method_monietude_enabled'],
+                ['value' => (string) ((int) $request->payment_method_monietude_enabled)]
+            );
+        }
+
+        if ($request->has('monietude_api_key')) {
+            Setting::updateOrCreate(
+                ['key' => 'monietude_api_key'],
+                ['value' => (string) trim($request->monietude_api_key)]
+            );
+        }
+
+        if ($request->has('monietude_provider')) {
+            Setting::updateOrCreate(
+                ['key' => 'monietude_provider'],
+                ['value' => (string) trim($request->monietude_provider)]
             );
         }
 
@@ -508,6 +583,61 @@ class SettingsController extends Controller
             );
         }
 
+        // Save Daily Login Gift Settings
+        if ($request->has('daily_gift_enabled')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_enabled'],
+                ['value' => (string) ((int) $request->daily_gift_enabled)]
+            );
+        }
+
+        if ($request->has('daily_gift_max_claims_per_day')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_max_claims_per_day'],
+                ['value' => (string) max(0, (int) $request->daily_gift_max_claims_per_day)]
+            );
+        }
+
+        if ($request->filled('daily_gift_type')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_type'],
+                ['value' => (string) $request->daily_gift_type]
+            );
+        }
+
+        if ($request->filled('daily_gift_fixed_amount')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_fixed_amount'],
+                ['value' => (string) max(0.001, (float) $request->daily_gift_fixed_amount)]
+            );
+        }
+
+        if ($request->filled('daily_gift_min_amount')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_min_amount'],
+                ['value' => (string) max(0.001, (float) $request->daily_gift_min_amount)]
+            );
+        }
+
+        if ($request->filled('daily_gift_max_amount')) {
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_max_amount'],
+                ['value' => (string) max(0.001, (float) $request->daily_gift_max_amount)]
+            );
+        }
+
+        if ($request->has('daily_gift_streak_amounts') && is_array($request->daily_gift_streak_amounts)) {
+            $cleaned = [];
+            for ($i = 1; $i <= 7; $i++) {
+                $val = $request->daily_gift_streak_amounts[$i] ?? null;
+                $cleaned[$i] = ($val !== null && is_numeric($val)) ? max(0.001, (float) $val) : 0.05;
+            }
+            Setting::updateOrCreate(
+                ['key' => 'daily_gift_streak_amounts'],
+                ['value' => json_encode($cleaned)]
+            );
+        }
+
         Cache::forget('settings:view_defaults:v1');
         Cache::forget('settings:view_defaults:v2');
 
@@ -517,7 +647,7 @@ class SettingsController extends Controller
     public function maintenance(Request $request)
     {
         $request->validate([
-            'action' => 'required|in:up,down,optimize_clear,config_cache,route_cache,view_cache',
+            'action' => 'required|in:up,down,optimize_clear,config_cache,route_cache,view_cache,storage_link',
         ]);
 
         $action = (string) $request->action;
@@ -545,9 +675,12 @@ class SettingsController extends Controller
                 Artisan::call('route:cache');
             } elseif ($action === 'view_cache') {
                 Artisan::call('view:cache');
+            } elseif ($action === 'storage_link') {
+                Artisan::call('storage:link');
+                return back()->with('success', 'Storage link created successfully (public/storage linked to storage/app/public).');
             }
         } catch (\Throwable $e) {
-            return back()->with('error', 'Maintenance action failed.');
+            return back()->with('error', 'Maintenance action failed: ' . $e->getMessage());
         }
 
         return back()->with('success', 'Maintenance action completed.');

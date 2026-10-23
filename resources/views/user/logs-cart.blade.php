@@ -101,7 +101,7 @@
             <div class="text-xs text-gray-500 mb-5">
                 Checkout will deduct from your wallet balance and deliver credentials instantly.
             </div>
-            <form action="/logs-store/checkout" method="POST">
+            <form action="/logs-store/checkout" method="POST" data-loader="true" data-loader-title="Processing Checkout..." data-loader-subtitle="Deducting balance and preparing instant credentials">
                 @csrf
                 <div class="mb-4">
                     <div class="text-xs font-extrabold text-gray-500 uppercase mb-1">Promo Code (Optional)</div>

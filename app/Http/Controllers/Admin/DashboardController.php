@@ -70,6 +70,31 @@ class DashboardController extends Controller
         $totalLogsGain = round($allTimeLogsUsd, 2);
         $totalAllTimeGain = round($totalSmsGain + $totalBoostGain + $totalLogsGain, 2);
 
+        // Comprehensive Total Spent metrics (SMS + Logs + Boosting)
+        $allTimeSpentUsd = round($allTimeSmsUsd + $allTimeBoostUsd + $allTimeLogsUsd, 2);
+        $todaySpentUsd = round($todaySmsUsd + $todayBoostUsd + $todayLogsUsd, 2);
+
+        // All-Time Funding Confirmed
+        $allTimeFundingUsd = (float) FundingTransaction::where('status', 'approved')->sum('amount_usd');
+        $allTimeFundingCount = (int) FundingTransaction::where('status', 'approved')->count();
+
+        // Order Volumes
+        $allTimeSmsCount = (int) SmsOrder::whereIn('status', ['RECEIVED', 'FINISHED', 'COMPLETED'])->count();
+        $allTimeBoostCount = (int) BoostOrder::whereIn('status', ['Completed', 'completed', 'FINISHED'])->count();
+        $allTimeLogsCount = (int) LogOrder::where('status', 'completed')->count();
+        $allTimeOrdersCount = $allTimeSmsCount + $allTimeBoostCount + $allTimeLogsCount;
+        $todayOrdersCount = (int) $todaySmsCount + (int) $todayBoostCount + (int) $todayLogsCount;
+
+        // Profit Margins %
+        $allTimeProfitMargin = $allTimeSpentUsd > 0 ? round(($totalAllTimeGain / $allTimeSpentUsd) * 100, 1) : 0;
+        $todayProfitMargin = $todaySpentUsd > 0 ? round(($todayTotalGain / $todaySpentUsd) * 100, 1) : 0;
+
+        // Quick Alert Counters
+        $pendingOrdersCount = (int) LogOrder::where('status', 'pending')->count() 
+                            + (int) SmsOrder::whereIn('status', ['PENDING', 'WAITING', 'pending'])->count() 
+                            + (int) BoostOrder::whereIn('status', ['pending', 'processing'])->count();
+        $pendingReportsCount = (int) \App\Models\OrderReport::where('status', 'pending')->count();
+
         $seriesDates = collect(range(6, 0))->map(fn ($i) => $today->copy()->subDays($i)->toDateString());
 
         $registrationsByDay = User::selectRaw('DATE(created_at) as d, COUNT(*) as c')
@@ -222,6 +247,22 @@ class DashboardController extends Controller
             'totalBoostGain',
             'totalLogsGain',
             'totalAllTimeGain',
+            'allTimeSpentUsd',
+            'todaySpentUsd',
+            'allTimeFundingUsd',
+            'allTimeFundingCount',
+            'allTimeSmsCount',
+            'allTimeBoostCount',
+            'allTimeLogsCount',
+            'allTimeOrdersCount',
+            'todayOrdersCount',
+            'allTimeProfitMargin',
+            'todayProfitMargin',
+            'pendingOrdersCount',
+            'pendingReportsCount',
+            'allTimeSmsUsd',
+            'allTimeBoostUsd',
+            'allTimeLogsUsd',
             'series',
             'latestUsers',
             'latestActivity',

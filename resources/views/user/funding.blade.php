@@ -4,23 +4,35 @@
 
 @section('dashboard_content')
 @php
-    $initialMethod = old('payment_method', $defaultFundingMethod ?? 'paymentpoint');
+    $initialMethod = old('payment_method', $defaultFundingMethod ?? 'monietude');
     $initialPayCurrency = old('pay_currency', 'usdttrc20');
-    $enabledFundingMethods = is_array($enabledFundingMethods ?? null) ? $enabledFundingMethods : ['paymentpoint', 'strollwallet', 'crypto'];
+    $enabledFundingMethods = is_array($enabledFundingMethods ?? null) ? $enabledFundingMethods : ['monietude', 'paymentpoint', 'pocketfi', 'strollwallet', 'crypto'];
     if (! in_array($initialMethod, $enabledFundingMethods, true)) {
-        $initialMethod = $enabledFundingMethods[0] ?? 'paymentpoint';
+        $initialMethod = $enabledFundingMethods[0] ?? 'monietude';
     }
     $symbol = ($currency ?? 'USD') === 'NGN' ? '₦' : '$';
     $displayBalance = ($currency ?? 'USD') === 'NGN'
         ? (auth()->user()->walletBalance ?? 0) * ($ngnPerUsd ?? 1500)
         : (auth()->user()->walletBalance ?? 0);
+    $charges = [
+        'paymentpoint' => \App\Models\FundingTransaction::getChargePercent('paymentpoint'),
+        'pocketfi' => \App\Models\FundingTransaction::getChargePercent('pocketfi'),
+        'strollwallet' => \App\Models\FundingTransaction::getChargePercent('strollwallet'),
+        'monietude' => \App\Models\FundingTransaction::getChargePercent('monietude'),
+        'crypto' => \App\Models\FundingTransaction::getChargePercent('crypto'),
+    ];
 @endphp
 
 <div x-data="{
     method: @js($initialMethod),
     amount: @js(old('amount', '')),
     currency: @js($currency ?? 'USD'),
+    symbol: @js($symbol),
+    charges: @js($charges),
     ngnPerUsd: {{ (float) ($ngnPerUsd ?? 1500) }},
+    get activeChargePercent() { return Number(this.charges[this.method] || 0); },
+    get chargeFeeAmount() { return (Number(this.amount || 0) * (this.activeChargePercent / 100)).toFixed(2); },
+    get netCreditedAmount() { return Math.max(0, Number(this.amount || 0) - Number(this.chargeFeeAmount)).toFixed(2); },
     get minUsd() { return this.method === 'crypto' ? 1 : (100 / Number(this.ngnPerUsd || 1)); },
     get minNgn() { return this.method === 'crypto' ? Number(this.ngnPerUsd || 0) : 100; },
     formatUsd(v) { return Number(v || 0).toFixed(2); },
@@ -31,18 +43,24 @@
         <div class="bg-[#0d9488] px-6 py-4">
             <div class="flex items-center justify-between">
                 <h3 class="text-white font-bold text-lg">Your Virtual Account</h3>
-                <span class="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">Active</span>
+                <div class="flex items-center gap-2">
+                    <a href="/tutorials?tab=funding" class="bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3 py-1 rounded-full transition flex items-center gap-1">
+                        <span>🎓</span>
+                        <span>How It Works</span>
+                    </a>
+                    <span class="bg-white/20 text-white text-xs font-bold px-3 py-1 rounded-full">Active</span>
+                </div>
             </div>
             <p class="text-teal-100 text-sm mt-1">Use this account for all your deposits</p>
         </div>
         <div class="p-6">
-            @foreach(['paymentpoint', 'strollwallet'] as $method)
+            @foreach(['monietude', 'paymentpoint', 'strollwallet'] as $method)
                 @if(isset($userVirtualAccounts[$method]))
                     <div x-show="method === '{{ $method }}'" style="{{ $initialMethod !== $method ? 'display:none;' : '' }}">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                             <div class="bg-gray-50 rounded-xl p-4">
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Bank</div>
-                                <div class="font-bold text-gray-900 text-lg">{{ $userVirtualAccounts[$method]['bank_name'] ?? 'Palmpay' }}</div>
+                                <div class="font-bold text-gray-900 text-lg">{{ $userVirtualAccounts[$method]['bank_name'] ?? 'PalmPay' }}</div>
                             </div>
                             <div class="bg-gray-50 rounded-xl p-4">
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Account Name</div>
@@ -50,7 +68,10 @@
                             </div>
                             <div class="bg-gray-50 rounded-xl p-4">
                                 <div class="text-xs text-gray-500 uppercase tracking-wide mb-1">Account Number</div>
-                                <div class="font-bold text-gray-900 text-lg">{{ $userVirtualAccounts[$method]['account_number'] ?? '' }}</div>
+                                <div class="flex items-center justify-between">
+                                    <div class="font-bold text-gray-900 text-lg font-mono">{{ $userVirtualAccounts[$method]['account_number'] ?? '' }}</div>
+                                    <button type="button" @click="navigator.clipboard.writeText('{{ $userVirtualAccounts[$method]['account_number'] ?? '' }}'); alert('Account number copied!')" class="text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 px-2.5 py-1 rounded-md font-medium transition">Copy</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -137,20 +158,21 @@
         </div>
         
         <div class="p-8">
-            <form action="/funding" method="POST">
+            <form action="/funding" method="POST" data-loader="true" data-loader-title="Initiating Deposit..." data-loader-subtitle="Connecting to secure payment gateway">
                 @csrf
 
                 <h4 class="text-md font-medium text-gray-700 mb-4">1. Select Payment Method</h4>
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-                    <!-- PaymentPoint -->
-                    @if(in_array('paymentpoint', $enabledFundingMethods, true))
+                <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                    <!-- Monietude PalmPay (Account 1) -->
+                    @if(in_array('monietude', $enabledFundingMethods, true))
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="paymentpoint" class="peer sr-only" x-model="method">
+                        <input type="radio" name="payment_method" value="monietude" class="peer sr-only" x-model="method">
                         <div class="rounded-xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50 hover:bg-gray-50 transition flex flex-col items-center justify-center text-center h-32">
-                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-[#0d9488]">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-emerald-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                             </div>
                             <span class="font-bold text-gray-800">Account 1</span>
+                            <span class="text-[10px] text-teal-600 font-semibold mt-0.5">PalmPay</span>
                         </div>
                         <div class="absolute top-2 right-2 hidden peer-checked:block text-[#0d9488]">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
@@ -158,13 +180,29 @@
                     </label>
                     @endif
 
-                    <!-- Strollwallet -->
-                    @if(in_array('strollwallet', $enabledFundingMethods, true))
+                    <!-- PaymentPoint (Account 2) -->
+                    @if(in_array('paymentpoint', $enabledFundingMethods, true))
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="strollwallet" class="peer sr-only" x-model="method">
+                        <input type="radio" name="payment_method" value="paymentpoint" class="peer sr-only" x-model="method">
                         <div class="rounded-xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50 hover:bg-gray-50 transition flex flex-col items-center justify-center text-center h-32">
-                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-purple-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-[#0d9488]">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path></svg>
+                            </div>
+                            <span class="font-bold text-gray-800">Account 2</span>
+                        </div>
+                        <div class="absolute top-2 right-2 hidden peer-checked:block text-[#0d9488]">
+                            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
+                        </div>
+                    </label>
+                    @endif
+
+                    <!-- PocketFi (Account 3) -->
+                    @if(in_array('pocketfi', $enabledFundingMethods, true))
+                    <label class="relative cursor-pointer">
+                        <input type="radio" name="payment_method" value="pocketfi" class="peer sr-only" x-model="method">
+                        <div class="rounded-xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50 hover:bg-gray-50 transition flex flex-col items-center justify-center text-center h-32">
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-indigo-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
                             </div>
                             <span class="font-bold text-gray-800">Account 3</span>
                         </div>
@@ -174,15 +212,15 @@
                     </label>
                     @endif
 
-                    <!-- PocketFi -->
-                    @if(in_array('pocketfi', $enabledFundingMethods, true))
+                    <!-- Strollwallet (Account 4) -->
+                    @if(in_array('strollwallet', $enabledFundingMethods, true))
                     <label class="relative cursor-pointer">
-                        <input type="radio" name="payment_method" value="pocketfi" class="peer sr-only" x-model="method">
+                        <input type="radio" name="payment_method" value="strollwallet" class="peer sr-only" x-model="method">
                         <div class="rounded-xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50 hover:bg-gray-50 transition flex flex-col items-center justify-center text-center h-32">
-                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-indigo-600">
-                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-purple-600">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
                             </div>
-                            <span class="font-bold text-gray-800">Account 2</span>
+                            <span class="font-bold text-gray-800">Account 4</span>
                         </div>
                         <div class="absolute top-2 right-2 hidden peer-checked:block text-[#0d9488]">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
@@ -198,7 +236,8 @@
                             <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-sm mb-2 text-yellow-500">
                                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                             </div>
-                            <span class="font-bold text-gray-800">Crypto Funding</span>
+                            <span class="font-bold text-gray-800">Crypto</span>
+                            <span class="text-[10px] text-yellow-600 font-semibold mt-0.5">USDT/BTC</span>
                         </div>
                         <div class="absolute top-2 right-2 hidden peer-checked:block text-[#0d9488]">
                             <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>
@@ -222,13 +261,13 @@
                     </div>
                 </div>
 
-                <div class="mb-8" x-show="method === 'crypto' || method === 'pocketfi' || method === 'paymentpoint' || method === 'strollwallet'">
+                <div class="mb-8" x-show="method === 'crypto' || method === 'pocketfi' || method === 'paymentpoint' || method === 'strollwallet' || method === 'monietude'">
                     <h4 class="text-md font-medium text-gray-700 mb-4">2. Enter Amount ({{ $currency ?? 'USD' }})</h4>
                     <div class="relative max-w-md">
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                             <span class="text-gray-500 font-bold text-lg">{{ $symbol }}</span>
                         </div>
-                        <input type="number" name="amount" min="1" x-model="amount" value="{{ old('amount') }}" step="{{ ($currency ?? 'USD') === 'NGN' ? '1' : '0.01' }}" class="block w-full pl-10 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] text-lg font-bold text-gray-900 transition" placeholder="0.00" x-bind:required="method === 'crypto' || method === 'pocketfi' || method === 'paymentpoint' || method === 'strollwallet'">
+                        <input type="number" name="amount" min="1" x-model="amount" value="{{ old('amount') }}" step="{{ ($currency ?? 'USD') === 'NGN' ? '1' : '0.01' }}" class="block w-full pl-10 pr-4 py-4 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] text-lg font-bold text-gray-900 transition" placeholder="0.00" x-bind:required="method === 'crypto' || method === 'pocketfi' || method === 'paymentpoint' || method === 'strollwallet' || method === 'monietude'">
                     </div>
                     <p class="text-sm text-gray-500 mt-2">
                         Minimum deposit:
@@ -317,7 +356,7 @@
         <svg class="w-6 h-6 text-blue-500 mt-0.5 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
         <div>
             <h4 class="font-medium text-blue-900 mb-1">Secure Transactions</h4>
-            <p class="text-sm text-blue-800 opacity-90">PaymentPoint, Strollwallet, and Crypto deposits are credited automatically once payment is confirmed. Keep your reference for support.</p>
+            <p class="text-sm text-blue-800 opacity-90">PaymentPoint, PocketFi, Strollwallet, PalmPay (Monietude), and Crypto deposits are credited automatically once payment is confirmed. Keep your reference for support.</p>
         </div>
     </div>
 </div>

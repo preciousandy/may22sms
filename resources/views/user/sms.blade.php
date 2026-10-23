@@ -3,81 +3,244 @@
 @section('page_title', 'SMS Verifications')
 
 @section('dashboard_content')
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-8">
-    <div class="px-6 py-5 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-gray-50 to-teal-50/20">
+@php
+    $walletBal = (float) (auth()->user()->walletBalance ?? 0);
+    $activeOrder = $orders->first(fn($o) => in_array(strtoupper($o->status), ['PENDING', 'WAITING'], true));
+@endphp
+
+<!-- Toast Alert Container -->
+<div id="toastNotification" class="fixed top-5 right-5 z-50 transform transition-all duration-300 translate-y-[-100px] opacity-0 pointer-events-none">
+    <div class="flex items-center gap-3 px-5 py-3.5 rounded-2xl shadow-xl border text-sm font-bold text-white bg-gray-900" id="toastInner">
+        <span id="toastIcon">✨</span>
+        <span id="toastMessage">Notification</span>
+    </div>
+</div>
+
+<!-- If User has an Active Pending Order, Show a Hero Live Verification Card -->
+@if($activeOrder)
+@php
+    $activeCreatedTs = optional($activeOrder->created_at)->getTimestamp() ?? time();
+    $activeProviderLabel = strtolower((string)($activeOrder->provider ?? '')) === 'daisysms' ? 'USA Server' : 'Global Server';
+@endphp
+<div class="mb-8 rounded-3xl p-6 sm:p-8 bg-gradient-to-br from-teal-900 via-slate-900 to-emerald-950 text-white shadow-xl border border-teal-500/30 relative overflow-hidden"
+     x-data="smsChecker({{ $activeOrder->id }}, @js($activeOrder->status), {{ $activeCreatedTs }})" 
+     x-init="initChecker()">
+    <!-- Ambient Glow Background -->
+    <div class="absolute -right-16 -top-16 w-64 h-64 bg-teal-500/20 rounded-full blur-3xl pointer-events-none"></div>
+    <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div>
-            <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-                <span>Buy Virtual Number</span>
-                <span class="bg-teal-100 text-[#0d9488] text-xs font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Live API</span>
+            <div class="flex items-center gap-3 mb-2 flex-wrap">
+                <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    Live Verification in Progress
+                </span>
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-white/10 text-gray-300">
+                    {{ $activeProviderLabel }}
+                </span>
+            </div>
+            <h3 class="text-2xl font-black tracking-tight text-white capitalize flex items-center gap-2">
+                <span>{{ $activeOrder->product }}</span>
+                <span class="text-xs px-2.5 py-1 rounded-lg bg-teal-800/80 text-teal-200 uppercase font-mono font-bold">{{ $activeOrder->country }}</span>
             </h3>
-            <p class="text-xs text-gray-500 mt-1">Receive SMS verification OTPs instantly for WhatsApp, Telegram, Google & more.</p>
+            <p class="text-xs text-teal-200/80 mt-1">Copy this phone number into the app to request your verification code.</p>
         </div>
-        <div class="flex items-center gap-2">
-            <span class="bg-[#0d9488] text-white text-xs font-bold px-3 py-1.5 rounded-full shadow-sm flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
-                Powered by May22SMS
-            </span>
+
+        <!-- Phone Number & Live OTP Display -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-white/5 backdrop-blur-md p-4 rounded-2xl border border-white/10">
+            <!-- Number Box -->
+            <div class="flex items-center justify-between sm:justify-start gap-4">
+                <div>
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">Phone Number</span>
+                    <span class="text-xl sm:text-2xl font-mono font-black text-white select-all">{{ $activeOrder->phone_number }}</span>
+                </div>
+                <button type="button" 
+                        onclick="copyTextToClipboard('{{ $activeOrder->phone_number }}', 'Phone number copied!')"
+                        class="p-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-gray-950 font-black transition flex items-center gap-1 text-xs shadow-md">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+                    <span>Copy</span>
+                </button>
+            </div>
+
+            <div class="hidden sm:block w-px h-10 bg-white/10"></div>
+
+            <!-- OTP Arrival Box -->
+            <div class="flex items-center justify-between sm:justify-start gap-4 min-w-[200px]">
+                <template x-if="status === 'RECEIVED' || status === 'received' || status === 'completed' || status === 'COMPLETED'">
+                    <div class="flex items-center gap-3 bg-emerald-500/20 border border-emerald-500/40 p-2.5 rounded-xl w-full justify-between animate-bounce">
+                        <div>
+                            <span class="text-[10px] uppercase font-black tracking-wider text-emerald-300 block">OTP Code</span>
+                            <span class="text-2xl font-mono font-black text-emerald-200 select-all tracking-widest" x-text="smsCode"></span>
+                        </div>
+                        <button type="button" @click="copyCode()" class="px-3 py-1.5 bg-emerald-400 hover:bg-emerald-300 text-emerald-950 rounded-lg text-xs font-black transition">
+                            Copy
+                        </button>
+                    </div>
+                </template>
+
+                <template x-if="status === 'PENDING' || status === 'pending' || status === 'WAITING' || status === 'waiting'">
+                    <div class="flex items-center gap-3">
+                        <svg class="animate-spin h-5 w-5 text-teal-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <div>
+                            <span class="text-xs font-bold text-teal-200" x-text="pollingMsg">Waiting for SMS...</span>
+                            <span x-show="showCountdown" class="block text-[10px] text-gray-400 font-mono" x-text="countdownText"></span>
+                        </div>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
-    
-    <div class="p-6 md:p-8">
-        <!-- Step 1: Provider Selection -->
-        <div class="mb-8">
-            <label class="block text-sm font-extrabold text-gray-800 mb-3 flex items-center justify-between">
-                <span>1. Select SMS Server</span>
-                <span class="text-xs text-gray-500 font-normal">Choose server location</span>
-            </label>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <!-- Hero SMS Option -->
-                @if(($herosmsEnabled ?? true))
+
+    <!-- Live Card Actions (Cancel / Status) -->
+    <div class="mt-4 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="text-gray-400 flex items-center gap-2">
+            <span>Order #{{ $activeOrder->id }}</span>
+            <span>•</span>
+            <span>Charge: <strong class="text-white">{{ $currencySymbol ?? '$' }}{{ number_format($activeOrder->price, 2) }}</strong></span>
+            <span>•</span>
+            <span class="text-teal-300">Auto-refunded if no SMS arrives within 20 mins</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+            <template x-if="canCancel && !canceling">
+                <button type="button" @click="handleCancel()" class="px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold transition flex items-center gap-1">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    <span>Cancel & Refund</span>
+                </button>
+            </template>
+            <span x-show="canceling" class="text-gray-400">Canceling order...</span>
+            <span x-show="cancelError" class="text-rose-400 font-semibold" x-text="cancelError"></span>
+        </div>
+    </div>
+</div>
+@endif
+
+<!-- Main Purchase Widget Card -->
+<div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden mb-8">
+    <!-- Header with Balance & Live Status -->
+    <div class="px-6 py-5 border-b border-gray-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-gray-50/80 via-white to-teal-50/30">
+        <div>
+            <h2 class="text-xl font-black text-gray-900 flex items-center gap-2.5">
+                <span>Buy Virtual Number</span>
+                <span class="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider">Instant OTP</span>
+            </h2>
+            <p class="text-xs text-gray-500 mt-1">Select an app or search below to get a dedicated verification phone number instantly.</p>
+        </div>
+
+        <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <!-- Quick Tutorial / Guide Link -->
+            <a href="/tutorials?tab=sms" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-teal-50 hover:bg-teal-100 text-[#0d9488] border border-teal-200/80 text-xs font-black transition">
+                <span>🎓</span>
+                <span>How to Use</span>
+            </a>
+
+            <!-- Wallet Balance Badge with Quick Top-Up -->
+            <div class="flex items-center gap-2 bg-gray-100/80 hover:bg-gray-100 border border-gray-200/60 px-3.5 py-1.5 rounded-2xl transition">
+                <span class="text-xs text-gray-500 font-medium">Wallet:</span>
+                <span class="text-sm font-black text-gray-900">{{ $currencySymbol ?? '$' }}{{ number_format($walletBal, 2) }}</span>
+                <a href="{{ url('/funding') }}" class="text-xs font-extrabold text-[#0d9488] hover:text-teal-700 ml-1 flex items-center gap-0.5" title="Add funds to wallet">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
+                    Top up
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="p-6 md:p-8 space-y-8">
+        <!-- 1. Destination / Server Pill Selector -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-xs font-black uppercase tracking-wider text-gray-500">1. Destination / Server</label>
+                <span class="text-[11px] text-gray-400">Choose server location</span>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-2xl">
+                <!-- Daisy SMS Option (USA) -->
+                @if(($daisysmsEnabled ?? true))
                 <label class="relative cursor-pointer group">
-                    <input type="radio" name="sms_provider_choice" value="herosms" class="peer sr-only" id="providerHero" checked>
-                    <div class="rounded-2xl border-2 border-gray-200 p-5 peer-checked:border-[#0d9488] peer-checked:bg-teal-50/50 hover:border-teal-300 transition flex flex-col justify-between h-full shadow-sm">
-                        <div class="flex justify-between items-start mb-3">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-teal-100 text-[#0d9488] flex items-center justify-center font-bold text-lg">⚡</div>
-                                <div>
-                                    <h4 class="font-extrabold text-gray-900 text-base">May SMS (Global)</h4>
-                                    <p class="text-xs text-gray-500">Global Service (50+ Countries)</p>
-                                </div>
+                    <input type="radio" name="sms_provider_choice" value="daisysms" class="peer sr-only" id="providerDaisy" checked>
+                    <div class="rounded-2xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50/40 hover:border-teal-300 transition flex items-center justify-between shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🇺🇸</span>
+                            <div>
+                                <h4 class="font-extrabold text-gray-900 text-sm flex items-center gap-1.5">
+                                    <span>United States (USA)</span>
+                                    <span class="bg-amber-100 text-amber-800 text-[9px] font-black px-1.5 py-0.5 rounded">High Success</span>
+                                </h4>
+                                <p class="text-[11px] text-gray-500">Dedicated physical SIM lines for US verifications.</p>
                             </div>
-                            <span class="bg-teal-100 text-teal-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">Global</span>
                         </div>
-                        <p class="text-xs text-gray-600">Best for international numbers across Europe, Asia, Africa & Americas.</p>
+                        <div class="w-5 h-5 rounded-full border-2 border-gray-300 peer-checked:border-[#0d9488] peer-checked:bg-[#0d9488] flex items-center justify-center">
+                            <div class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100"></div>
+                        </div>
                     </div>
                 </label>
                 @endif
 
-                <!-- Daisy SMS Option -->
-                @if(($daisysmsEnabled ?? true))
+                <!-- Hero SMS Option (Global) -->
+                @if(($herosmsEnabled ?? true))
                 <label class="relative cursor-pointer group">
-                    <input type="radio" name="sms_provider_choice" value="daisysms" class="peer sr-only" id="providerDaisy" {{ !($herosmsEnabled ?? true) ? 'checked' : '' }}>
-                    <div class="rounded-2xl border-2 border-gray-200 p-5 peer-checked:border-[#0d9488] peer-checked:bg-teal-50/50 hover:border-teal-300 transition flex flex-col justify-between h-full shadow-sm">
-                        <div class="flex justify-between items-start mb-3">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-lg">🇺🇸</div>
-                                <div>
-                                    <h4 class="font-extrabold text-gray-900 text-base">May SMS (USA)</h4>
-                                    <p class="text-xs text-gray-500">United States Only</p>
-                                </div>
+                    <input type="radio" name="sms_provider_choice" value="herosms" class="peer sr-only" id="providerHero" {{ !($daisysmsEnabled ?? true) ? 'checked' : '' }}>
+                    <div class="rounded-2xl border-2 border-gray-200 p-4 peer-checked:border-[#0d9488] peer-checked:bg-teal-50/40 hover:border-teal-300 transition flex items-center justify-between shadow-sm">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">🌍</span>
+                            <div>
+                                <h4 class="font-extrabold text-gray-900 text-sm flex items-center gap-1.5">
+                                    <span>Global Numbers (50+ Countries)</span>
+                                </h4>
+                                <p class="text-[11px] text-gray-500">UK, Canada, Europe, Asia, Africa & more.</p>
                             </div>
-                            <span class="bg-amber-100 text-amber-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">USA Only</span>
                         </div>
-                        <p class="text-xs text-gray-600">Dedicated high-deliverability US virtual phone numbers.</p>
+                        <div class="w-5 h-5 rounded-full border-2 border-gray-300 peer-checked:border-[#0d9488] peer-checked:bg-[#0d9488] flex items-center justify-center">
+                            <div class="w-2 h-2 rounded-full bg-white opacity-0 peer-checked:opacity-100"></div>
+                        </div>
                     </div>
                 </label>
                 @endif
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Step 2: Country Selection -->
-            <div>
-                <label class="block text-sm font-extrabold text-gray-800 mb-2 flex items-center justify-between">
-                    <span>2. Select Country</span>
-                    <span id="countryNotice" class="text-xs font-semibold text-teal-700"></span>
-                </label>
-                <select id="countrySelect" class="block w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-medium">
+        <!-- 2. Country Selector (Visible when Global is chosen) -->
+        <div id="countrySection" class="hidden transition-all duration-300">
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-xs font-black uppercase tracking-wider text-gray-500">2. Select Country</label>
+                <span id="countryNotice" class="text-xs font-semibold text-[#0d9488]"></span>
+            </div>
+
+            <!-- Quick Country Chips for Top Regions -->
+            <div class="flex items-center gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none" id="popularCountriesPills">
+                <button type="button" onclick="selectQuickCountry('united kingdom')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇬🇧</span> UK
+                </button>
+                <button type="button" onclick="selectQuickCountry('canada')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇨🇦</span> Canada
+                </button>
+                <button type="button" onclick="selectQuickCountry('nigeria')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇳🇬</span> Nigeria
+                </button>
+                <button type="button" onclick="selectQuickCountry('kenya')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇰🇪</span> Kenya
+                </button>
+                <button type="button" onclick="selectQuickCountry('south africa')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇿🇦</span> South Africa
+                </button>
+                <button type="button" onclick="selectQuickCountry('germany')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇩🇪</span> Germany
+                </button>
+                <button type="button" onclick="selectQuickCountry('france')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇫🇷</span> France
+                </button>
+                <button type="button" onclick="selectQuickCountry('india')" class="quick-country-btn px-3 py-1.5 rounded-xl border border-gray-200 hover:border-teal-400 bg-gray-50 text-xs font-bold text-gray-700 whitespace-nowrap transition flex items-center gap-1.5">
+                    <span>🇮🇳</span> India
+                </button>
+            </div>
+
+            <div class="max-w-md">
+                <select id="countrySelect" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-semibold bg-white">
                     @if(isset($countries) && $countries->count() > 0)
                         @foreach($countries as $country)
                             <option value="{{ strtolower($country->slug) }}">{{ $country->name }}</option>
@@ -87,188 +250,299 @@
                     @endif
                 </select>
             </div>
-            
-            <!-- Step 3: Service Selection -->
-            <div>
-                <label class="block text-sm font-extrabold text-gray-800 mb-2">3. Select Service</label>
-                <div class="relative">
-                    <input type="text" id="serviceSearch" class="block w-full px-4 py-2.5 mb-2 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] transition text-xs font-medium" placeholder="🔍 Search service (e.g. whatsapp, telegram)..." disabled>
-                    <select id="serviceSelect" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-medium" disabled size="5">
-                        <option value="">Loading services...</option>
-                    </select>
+        </div>
+
+        <!-- 3. Popular Apps 1-Click Grid -->
+        <div>
+            <div class="flex items-center justify-between mb-3">
+                <label class="text-xs font-black uppercase tracking-wider text-gray-500">3. Popular Services (1-Click Select)</label>
+                <span class="text-[11px] text-teal-700 font-bold" id="serviceLoadingIndicator">Loading pricing...</span>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3" id="popularAppsGrid">
+                <!-- App Card: WhatsApp -->
+                <button type="button" onclick="selectAppCard('whatsapp')" id="appCard-whatsapp" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        💬
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">WhatsApp</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="whatsapp">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="whatsapp"></span>
+                </button>
+
+                <!-- App Card: Telegram -->
+                <button type="button" onclick="selectAppCard('telegram')" id="appCard-telegram" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        ✈️
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">Telegram</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="telegram">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="telegram"></span>
+                </button>
+
+                <!-- App Card: Google -->
+                <button type="button" onclick="selectAppCard('google')" id="appCard-google" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        🔍
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">Google</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="google">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="google"></span>
+                </button>
+
+                <!-- App Card: Instagram -->
+                <button type="button" onclick="selectAppCard('instagram')" id="appCard-instagram" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-pink-100 text-pink-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        📸
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">Instagram</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="instagram">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="instagram"></span>
+                </button>
+
+                <!-- App Card: TikTok -->
+                <button type="button" onclick="selectAppCard('tiktok')" id="appCard-tiktok" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-gray-900 text-white flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        🎵
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">TikTok</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="tiktok">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="tiktok"></span>
+                </button>
+
+                <!-- App Card: OpenAI -->
+                <button type="button" onclick="selectAppCard('openai')" id="appCard-openai" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-emerald-950 text-emerald-400 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        🤖
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">OpenAI / GPT</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="openai">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="openai"></span>
+                </button>
+
+                <!-- App Card: Tinder -->
+                <button type="button" onclick="selectAppCard('tinder')" id="appCard-tinder" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        🔥
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">Tinder</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="tinder">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="tinder"></span>
+                </button>
+
+                <!-- App Card: Facebook -->
+                <button type="button" onclick="selectAppCard('facebook')" id="appCard-facebook" class="app-card group relative p-3.5 rounded-2xl border-2 border-gray-200 hover:border-[#0d9488] hover:bg-teal-50/30 transition flex flex-col items-center text-center bg-white shadow-sm">
+                    <div class="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center text-xl mb-2 group-hover:scale-110 transition">
+                        👥
+                    </div>
+                    <span class="text-xs font-extrabold text-gray-900 block truncate w-full">Facebook</span>
+                    <span class="text-[11px] font-black text-[#0d9488] mt-1 app-price-badge" data-service="facebook">--</span>
+                    <span class="text-[9px] text-gray-400 font-medium app-count-badge" data-service="facebook"></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 4. Search All 150+ Services -->
+        <div class="relative">
+            <label class="text-xs font-black uppercase tracking-wider text-gray-500 mb-2 block">Or Search Any of 150+ Services</label>
+            <div class="relative">
+                <input type="text" id="serviceSearch" 
+                       class="block w-full px-4 py-3 pl-11 border-2 border-gray-200 rounded-2xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-semibold bg-white" 
+                       placeholder="🔍 Search service (e.g. PayPal, Uber, Twitter/X, Discord, Netflix, DoorDash)..." 
+                       autocomplete="off">
+                <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
                 </div>
             </div>
 
-            <!-- Step 4: Operator Selection -->
-            <div>
-                <label class="block text-sm font-extrabold text-gray-800 mb-2">4. Select Operator</label>
-                <select id="operatorSelect" class="block w-full px-4 py-3.5 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-medium" disabled>
-                    <option value="">Select service first</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 pt-6 border-t border-gray-100">
-            <div>
-                <label class="block text-sm font-extrabold text-gray-800 mb-2">5. Promo Code (Optional)</label>
-                <input type="text" id="promoCodeInput" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-0 focus:border-[#0d9488] transition text-sm font-mono" placeholder="e.g. WELCOME10">
-                <div class="mt-1.5 text-xs text-gray-500">Enter a discount promo code if you have one.</div>
+            <!-- Custom Live Dropdown Results -->
+            <div id="serviceSearchResults" class="hidden absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl shadow-2xl border border-gray-200 z-30 max-h-60 overflow-y-auto divide-y divide-gray-100">
+                <!-- Dynamically populated -->
             </div>
 
-            @if(($premiumEnabled ?? false))
-                <div class="flex items-center">
-                    <label class="inline-flex items-center gap-3 p-4 rounded-xl border border-teal-100 bg-teal-50/40 w-full cursor-pointer hover:bg-teal-50 transition">
-                        <input type="checkbox" id="premiumToggle" class="w-5 h-5 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]">
-                        <div>
-                            <span class="block text-sm font-extrabold text-gray-800">Premium High-Speed SMS</span>
-                            <span class="block text-xs text-gray-500">Priority routing for faster OTP delivery (+{{ (float)($premiumMarkupPercent ?? 40) }}% price)</span>
-                        </div>
-                    </label>
+            <!-- Hidden native select for form state/compatibility -->
+            <select id="serviceSelect" class="sr-only">
+                <option value="">Select a service</option>
+            </select>
+        </div>
+
+        <!-- Advanced Accordion: Operator, Promo, Premium -->
+        <div class="pt-2">
+            <details class="group rounded-2xl border border-gray-200/80 bg-gray-50/50 p-4 transition [&_summary::-webkit-details-marker]:hidden">
+                <summary class="flex items-center justify-between cursor-pointer font-bold text-xs text-gray-700 hover:text-gray-900">
+                    <span class="flex items-center gap-2">
+                        <span>⚙️</span>
+                        <span>Advanced Options: Carrier Network & Promo Code</span>
+                    </span>
+                    <span class="text-gray-400 transition group-open:rotate-180">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                    </span>
+                </summary>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200/60">
+                    <!-- Operator Dropdown -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Carrier Network Operator</label>
+                        <select id="operatorSelect" class="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-0 focus:border-[#0d9488] text-xs font-medium bg-white">
+                            <option value="any">Any / Best Route (Recommended)</option>
+                        </select>
+                        <span class="text-[10px] text-gray-400 mt-1 block">Default: "Any" provides highest availability.</span>
+                    </div>
+
+                    <!-- Promo Code -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 mb-1">Promo Code</label>
+                        <input type="text" id="promoCodeInput" class="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-0 focus:border-[#0d9488] text-xs font-mono bg-white uppercase" placeholder="e.g. DISCOUNT10">
+                        <span class="text-[10px] text-gray-400 mt-1 block">Optional discount code</span>
+                    </div>
+
+                    <!-- Premium High-Speed Routing -->
+                    @if(($premiumEnabled ?? false))
+                    <div class="md:col-span-2">
+                        <label class="flex items-center gap-3 p-3 rounded-xl border border-teal-200 bg-teal-50/40 cursor-pointer hover:bg-teal-50 transition">
+                            <input type="checkbox" id="premiumToggle" class="w-4 h-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488]">
+                            <div>
+                                <span class="block text-xs font-bold text-gray-800">Premium Priority Routing (+{{ (float)($premiumMarkupPercent ?? 40) }}%)</span>
+                                <span class="block text-[10px] text-gray-500">Optimized line priority for time-sensitive OTP verification</span>
+                            </div>
+                        </label>
+                    </div>
+                    @endif
                 </div>
-            @endif
+            </details>
         </div>
 
-        <!-- Price Display and Purchase Button -->
-        <div class="mt-8 pt-6 border-t border-gray-100 flex flex-col md:flex-row justify-between items-center bg-gray-50 p-6 rounded-2xl">
-            <div class="mb-4 md:mb-0">
-                <span class="text-gray-500 text-xs font-bold uppercase tracking-wider block">Estimated Price</span>
-                <div class="text-3xl font-black text-[#0d9488]" id="priceDisplay">{{ $currencySymbol ?? '$' }}0.00</div>
+        <!-- Sticky / Prominent Bottom Action Bar -->
+        <div class="rounded-3xl p-5 sm:p-6 bg-gradient-to-r from-gray-900 to-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-5 shadow-lg">
+            <!-- Selected Summary -->
+            <div class="flex items-center gap-4 w-full md:w-auto">
+                <div class="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-2xl" id="summaryAppIcon">
+                    📱
+                </div>
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-black text-white" id="summaryAppName">Select a service</span>
+                        <span class="text-xs px-2 py-0.5 rounded bg-white/15 text-gray-300 uppercase font-mono font-bold" id="summaryCountry">USA</span>
+                    </div>
+                    <div class="text-xs text-gray-400 mt-0.5" id="summaryStock">Choose an app above to view stock & price</div>
+                </div>
             </div>
-            
-            <button id="buyBtn" disabled class="w-full md:w-auto bg-[#facc15] text-black px-10 py-3.5 rounded-xl font-black shadow-md hover:bg-yellow-400 hover:shadow-lg transition transform hover:-translate-y-0.5 disabled:opacity-50 disabled:cursor-not-allowed text-base flex items-center justify-center gap-2">
-                <span>Get Phone Number</span>
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-            </button>
+
+            <!-- Price & Buy Action -->
+            <div class="flex items-center justify-between md:justify-end gap-5 w-full md:w-auto">
+                <div class="text-right">
+                    <span class="text-[10px] uppercase font-bold tracking-wider text-gray-400 block">Total Price</span>
+                    <div class="text-2xl sm:text-3xl font-black text-emerald-400" id="priceDisplay">{{ $currencySymbol ?? '$' }}0.00</div>
+                </div>
+
+                <button id="buyBtn" disabled 
+                        class="px-8 py-3.5 rounded-2xl font-black shadow-lg transition-all duration-200 transform hover:-translate-y-0.5 disabled:opacity-40 disabled:cursor-not-allowed text-sm sm:text-base flex items-center justify-center gap-2 bg-[#facc15] hover:bg-yellow-400 text-gray-950">
+                    <span>⚡ Get Phone Number</span>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                </button>
+            </div>
         </div>
 
-        <div id="alertMessage" class="mt-4 hidden p-4 rounded-xl text-sm font-bold"></div>
+        <div id="alertMessage" class="hidden p-4 rounded-2xl text-sm font-bold"></div>
     </div>
 </div>
 
-<!-- Active Orders Section -->
-<div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-    <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+<!-- Active & Recent Orders Section -->
+<div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+    <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/60">
         <div>
-            <h3 class="text-lg font-bold text-gray-800">Your Virtual Numbers</h3>
-            <p class="text-xs text-gray-500">Real-time status updates and SMS codes</p>
+            <h3 class="text-lg font-black text-gray-900">Your Virtual Numbers History</h3>
+            <p class="text-xs text-gray-500">Real-time status updates, active codes, and previous orders</p>
         </div>
-        <button onclick="location.reload()" class="text-xs text-[#0d9488] font-bold bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-xl transition flex items-center gap-1.5">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-            Refresh
+        <button onclick="location.reload()" class="text-xs text-[#0d9488] font-bold bg-teal-50 hover:bg-teal-100 px-3 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+            Refresh List
         </button>
     </div>
     
     <div class="p-0">
         @if($orders->count() > 0)
             <div class="overflow-x-auto">
-                <table class="min-w-full divide-y divide-gray-200">
-                    <thead class="bg-gray-50">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead class="bg-gray-50/70">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Service / Provider</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone Number</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Charge</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SMS Code</th>
-                            <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Service / Country</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Phone Number</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Price</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">SMS OTP</th>
+                            <th class="px-6 py-3.5 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="bg-white divide-y divide-gray-200">
+                    <tbody class="bg-white divide-y divide-gray-100 text-sm">
                         @foreach($orders as $order)
                         @php
                             $createdTs = optional($order->created_at)->getTimestamp() ?? time();
                             $isPending = in_array(strtoupper($order->status), ['PENDING', 'WAITING'], true);
                             $isReceived = in_array(strtoupper($order->status), ['RECEIVED', 'COMPLETED', 'FINISHED'], true);
                             $isCanceled = in_array(strtoupper($order->status), ['CANCELED', 'CANCELLED', 'TIMEOUT', 'REFUNDED'], true);
-                            $providerLabel = strtolower((string)($order->provider ?? '')) === 'daisysms' ? 'May SMS (USA)' : (strtolower((string)($order->provider ?? '')) === 'herosms' ? 'May SMS (Global)' : 'May SMS');
+                            $providerLabel = strtolower((string)($order->provider ?? '')) === 'daisysms' ? 'USA' : 'Global';
                         @endphp
-                        <tr>
+                        <tr class="hover:bg-gray-50/50 transition">
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-extrabold text-gray-900 capitalize">{{ $order->product }}</div>
+                                <div class="font-extrabold text-gray-900 capitalize">{{ $order->product }}</div>
                                 <div class="text-xs text-gray-500 capitalize flex items-center gap-1.5 mt-0.5">
-                                    <span>{{ $order->country }} ({{ $order->operator }})</span>
-                                    <span class="px-2 py-0.2 rounded-full text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">{{ $providerLabel }}</span>
+                                    <span>{{ $order->country }}</span>
+                                    <span class="px-1.5 py-0.2 rounded text-[10px] font-bold bg-gray-100 text-gray-600 border border-gray-200">{{ $providerLabel }}</span>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-base font-mono font-black text-gray-800 select-all">{{ $order->phone_number }}</span>
-                                    <button type="button" onclick="navigator.clipboard.writeText('{{ $order->phone_number }}'); showAlert('Phone number copied!')" class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg bg-teal-50 text-[#0d9488] hover:bg-teal-100 transition font-bold" title="Copy Phone Number">
+                                    <span class="text-base font-mono font-black text-gray-900 select-all">{{ $order->phone_number }}</span>
+                                    <button type="button" onclick="copyTextToClipboard('{{ $order->phone_number }}', 'Phone number copied!')" class="p-1.5 rounded-lg bg-gray-100 hover:bg-teal-50 text-gray-600 hover:text-[#0d9488] transition" title="Copy Number">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                        Copy
                                     </button>
                                 </div>
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap">
-                                <div class="text-sm font-bold text-[#0d9488]">{{ $currencySymbol ?? '$' }}{{ ($formatAmount ?? fn($x) => number_format($x, 2))($order->price) }}</div>
+                            <td class="px-6 py-4 whitespace-nowrap font-bold text-gray-900">
+                                {{ $currencySymbol ?? '$' }}{{ number_format($order->price, 2) }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if($isPending)
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-yellow-100 text-yellow-800 animate-pulse">Waiting for SMS</span>
+                                    <span class="px-2.5 py-1 inline-flex text-xs font-black rounded-full bg-amber-100 text-amber-800 animate-pulse">Waiting for SMS</span>
                                 @elseif($isReceived)
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-green-100 text-green-800">Received</span>
+                                    <span class="px-2.5 py-1 inline-flex text-xs font-black rounded-full bg-emerald-100 text-emerald-800">Received</span>
                                 @elseif($isCanceled)
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-red-100 text-red-800">Canceled / Refunded</span>
+                                    <span class="px-2.5 py-1 inline-flex text-xs font-bold rounded-full bg-red-100 text-red-700">Refunded</span>
                                 @else
-                                    <span class="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-gray-100 text-gray-800">{{ $order->status }}</span>
+                                    <span class="px-2.5 py-1 inline-flex text-xs font-bold rounded-full bg-gray-100 text-gray-800">{{ $order->status }}</span>
                                 @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if($order->sms_code)
-                                    <span class="font-black text-lg tracking-wider text-[#0d9488] select-all">{{ $order->sms_code }}</span>
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-mono font-black text-lg text-emerald-700 tracking-wider select-all">{{ $order->sms_code }}</span>
+                                        <button type="button" onclick="copyTextToClipboard('{{ $order->sms_code }}', 'SMS code copied!')" class="p-1 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold">
+                                            Copy
+                                        </button>
+                                    </div>
                                 @else
                                     <span class="text-gray-400 italic">--</span>
                                 @endif
                             </td>
-                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <td class="px-6 py-4 whitespace-nowrap text-right">
                                 <div x-data="smsChecker({{ $order->id }}, @js($order->status), {{ $createdTs }})" x-init="initChecker()">
                                     <template x-if="status === 'pending' || status === 'PENDING'">
-                                        <div class="flex flex-col items-end gap-2">
-                                            <div class="flex items-center justify-end text-yellow-600 font-bold text-xs">
-                                                <svg class="animate-spin h-3.5 w-3.5 mr-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                <span x-text="pollingMsg"></span>
-                                            </div>
-                                            <div class="flex items-center justify-end gap-2">
-                                                <div x-show="showCountdown" x-transition.opacity class="text-[11px] text-gray-500 font-medium rounded-full bg-gray-100 px-3 py-1">
-                                                    Cancel available: <span class="font-mono font-bold text-gray-800" x-text="countdownText"></span>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    x-show="canCancel && !canceling"
-                                                    x-transition
-                                                    @click="handleCancel()"
-                                                    class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-red-600 hover:bg-red-700 text-white shadow-sm transition">
-                                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                                                    Cancel & Refund
-                                                </button>
-                                                <span x-show="canceling" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-gray-300 text-gray-600">
-                                                    <svg class="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
-                                                    Canceling...
-                                                </span>
-                                            </div>
-                                            <div x-show="cancelError" class="text-xs text-red-600" x-text="cancelError"></div>
+                                        <div class="flex items-center justify-end gap-2">
+                                            <button
+                                                type="button"
+                                                x-show="canCancel && !canceling"
+                                                @click="handleCancel()"
+                                                class="px-2.5 py-1 text-xs font-bold rounded-lg bg-rose-600 hover:bg-rose-700 text-white transition">
+                                                Cancel & Refund
+                                            </button>
+                                            <span x-show="!canCancel" class="text-[11px] text-gray-400 font-mono" x-text="countdownText"></span>
                                         </div>
-                                    </template>
-                                    <template x-if="status === 'RECEIVED' || status === 'received' || status === 'completed' || status === 'COMPLETED'">
-                                        <div class="flex items-center justify-end">
-                                            <span class="inline-flex items-center gap-1 text-green-600 font-bold">
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"></path></svg>
-                                                <span class="text-lg tracking-wider select-all font-mono font-black" x-text="smsCode"></span>
-                                                <button type="button" @click="copyCode()" class="ml-2 text-xs px-2.5 py-1 rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition font-bold">Copy</button>
-                                            </span>
-                                        </div>
-                                    </template>
-                                    <template x-if="status === 'canceled' || status === 'CANCELED' || status === 'CANCELLED' || status === 'TIMEOUT'">
-                                        <span class="text-red-500 font-bold text-xs">Canceled (Refunded)</span>
                                     </template>
 
-                                    <div class="mt-2 flex items-center justify-end" x-data="{ reported: @js((bool)($order->is_reported ?? false)), submitting: false }">
+                                    <div class="mt-1 flex items-center justify-end" x-data="{ reported: @js((bool)($order->is_reported ?? false)), submitting: false }">
                                         <template x-if="reported">
-                                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-100 text-amber-800 border border-amber-200">
-                                                🚩 Reported
-                                            </span>
+                                            <span class="text-[10px] font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded">🚩 Reported</span>
                                         </template>
                                         <template x-if="!reported && !['received', 'completed', 'finished'].includes((status || '').toLowerCase())">
                                             <button 
@@ -286,18 +560,18 @@
                                                             submitting = false;
                                                             if (data.success) {
                                                                 reported = true;
-                                                                alert(data.message);
+                                                                showNotification('Report submitted successfully.');
                                                             } else {
                                                                 alert(data.message || 'Could not report order.');
                                                             }
                                                         })
-                                                        .catch(e => { submitting = false; alert('Error submitting report.'); });
+                                                        .catch(() => { submitting = false; alert('Error submitting report.'); });
                                                     }
                                                 "
-                                                class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1 rounded-lg transition"
+                                                class="text-[11px] text-gray-400 hover:text-rose-600 transition"
                                                 :disabled="submitting">
-                                                <span x-show="!submitting">🚩 Report Issue</span>
-                                                <span x-show="submitting">Submitting...</span>
+                                                <span x-show="!submitting">Report</span>
+                                                <span x-show="submitting">...</span>
                                             </button>
                                         </template>
                                     </div>
@@ -313,10 +587,11 @@
             </div>
         @else
             <div class="p-12 text-center text-gray-500">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-4 text-gray-400">
+                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-50 mb-3 text-gray-400">
                     <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>
                 </div>
-                <p class="font-medium">No active virtual numbers. Select a provider and service above to purchase a number.</p>
+                <p class="font-bold text-gray-700">No active virtual numbers.</p>
+                <p class="text-xs text-gray-400 mt-1">Select an app above to purchase your first virtual number.</p>
             </div>
         @endif
     </div>
@@ -324,25 +599,57 @@
 
 <script>
     let currentServicesData = null;
+    let selectedServiceKey = '';
     let selectedBasePrice = 0;
     let selectedPrice = 0;
     const currencySymbol = @js($currencySymbol ?? '$');
     const currencyFx = {{ (float) ($currencyFx ?? 1) }};
+    const userWalletBalance = {{ (float) ($walletBal ?? 0) }};
     const premiumEnabled = @js((bool) ($premiumEnabled ?? false));
     const premiumMarkupPercent = {{ (float) ($premiumMarkupPercent ?? 40) }};
 
     const countrySelect = document.getElementById('countrySelect');
+    const countrySection = document.getElementById('countrySection');
     const countryNotice = document.getElementById('countryNotice');
     const serviceSearch = document.getElementById('serviceSearch');
+    const serviceSearchResults = document.getElementById('serviceSearchResults');
     const serviceSelect = document.getElementById('serviceSelect');
     const operatorSelect = document.getElementById('operatorSelect');
     const priceDisplay = document.getElementById('priceDisplay');
     const buyBtn = document.getElementById('buyBtn');
-    const alertMessage = document.getElementById('alertMessage');
     const promoCodeInput = document.getElementById('promoCodeInput');
     const premiumToggle = document.getElementById('premiumToggle');
+    const summaryAppIcon = document.getElementById('summaryAppIcon');
+    const summaryAppName = document.getElementById('summaryAppName');
+    const summaryCountry = document.getElementById('summaryCountry');
+    const summaryStock = document.getElementById('summaryStock');
+    const serviceLoadingIndicator = document.getElementById('serviceLoadingIndicator');
 
-    const favoriteServices = ['whatsapp', 'telegram', 'tiktok', 'facebook', 'instagram', 'google', 'twitter', 'discord'];
+    const appIcons = {
+        'whatsapp': '💬',
+        'telegram': '✈️',
+        'google': '🔍',
+        'instagram': '📸',
+        'tiktok': '🎵',
+        'openai': '🤖',
+        'tinder': '🔥',
+        'facebook': '👥',
+        'twitter': '🐦',
+        'discord': '🎮',
+        'netflix': '🍿',
+        'uber': '🚗',
+        'paypal': '💳',
+        'amazon': '📦',
+        'snapchat': '👻',
+        'microsoft': '🪟',
+        'apple': '🍏',
+        'doordash': '🍔',
+        'steam': '🕹️',
+    };
+
+    function getAppIcon(key) {
+        return appIcons[(key || '').toLowerCase()] || '📱';
+    }
 
     function formatServiceName(service) {
         const names = {
@@ -363,15 +670,12 @@
             'other': 'Any Other',
         };
         const key = (service || '').toLowerCase();
-        if (names[key]) {
-            return names[key];
-        }
-        return service.charAt(0).toUpperCase() + service.slice(1);
+        return names[key] || (service.charAt(0).toUpperCase() + service.slice(1));
     }
 
     function getSelectedProvider() {
         const selectedRadio = document.querySelector('input[name="sms_provider_choice"]:checked');
-        return selectedRadio ? selectedRadio.value : 'herosms';
+        return selectedRadio ? selectedRadio.value : 'daisysms';
     }
 
     function round2(x) {
@@ -386,213 +690,336 @@
         return isPremiumSelected() ? (1 + (premiumMarkupPercent / 100)) : 1;
     }
 
-    function showAlert(message, isError = false) {
-        alertMessage.textContent = message;
-        alertMessage.className = `mt-4 p-4 rounded-xl text-sm font-bold ${isError ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`;
-        alertMessage.classList.remove('hidden');
-        
-        setTimeout(() => {
-            alertMessage.classList.add('hidden');
-        }, 5000);
+    // Play subtle audio chime on OTP arrival
+    function playOtpArrivalChime() {
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+            osc.frequency.setValueAtTime(880.00, ctx.currentTime + 0.1); // A5
+            gain.gain.setValueAtTime(0.1, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.4);
+        } catch (e) {}
     }
 
-    function updateCountryFieldState() {
+    function showNotification(msg, icon = '✨') {
+        const toast = document.getElementById('toastNotification');
+        const toastMsg = document.getElementById('toastMessage');
+        const toastIcon = document.getElementById('toastIcon');
+        toastMsg.textContent = msg;
+        toastIcon.textContent = icon;
+        toast.classList.remove('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+        setTimeout(() => {
+            toast.classList.add('translate-y-[-100px]', 'opacity-0', 'pointer-events-none');
+        }, 3500);
+    }
+
+    function copyTextToClipboard(text, msg = 'Copied to clipboard!') {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => showNotification(msg, '📋')).catch(() => {});
+        } else {
+            showNotification(msg, '📋');
+        }
+    }
+
+    function updateDestinationMode() {
         const provider = getSelectedProvider();
         if (provider === 'daisysms') {
+            countrySection.classList.add('hidden');
             countrySelect.value = 'usa';
-            countrySelect.disabled = true;
-            if (countryNotice) countryNotice.textContent = '🇺🇸 Locked to USA for May SMS (USA)';
+            summaryCountry.textContent = 'USA 🇺🇸';
         } else {
-            countrySelect.disabled = false;
-            if (countryNotice) countryNotice.textContent = '';
+            countrySection.classList.remove('hidden');
+            summaryCountry.textContent = (countrySelect.options[countrySelect.selectedIndex]?.text || 'Global').toUpperCase();
+        }
+    }
+
+    function selectQuickCountry(slug) {
+        document.querySelectorAll('.quick-country-btn').forEach(btn => {
+            btn.classList.remove('bg-teal-50', 'border-[#0d9488]', 'text-[#0d9488]');
+        });
+        const matched = Array.from(countrySelect.options).find(opt => opt.value.toLowerCase() === slug.toLowerCase() || opt.text.toLowerCase().includes(slug.toLowerCase()));
+        if (matched) {
+            countrySelect.value = matched.value;
+            countrySelect.dispatchEvent(new Event('change'));
         }
     }
 
     async function loadServices() {
-        updateCountryFieldState();
-
+        updateDestinationMode();
+        serviceLoadingIndicator.textContent = 'Loading pricing...';
         serviceSearch.disabled = true;
-        serviceSelect.innerHTML = '<option value="">Loading services...</option>';
-        serviceSelect.disabled = true;
-        operatorSelect.innerHTML = '<option value="">Select service first</option>';
-        operatorSelect.disabled = true;
         buyBtn.disabled = true;
-        priceDisplay.textContent = `${currencySymbol}0.00`;
 
         const provider = getSelectedProvider();
-        const country = countrySelect.value || 'usa';
-        
+        const country = (provider === 'daisysms') ? 'usa' : (countrySelect.value || 'usa');
+
         try {
             const response = await fetch(`/api/sms/services?provider=${provider}&country=${country}`);
             const data = await response.json();
             currentServicesData = data;
+            serviceLoadingIndicator.textContent = 'Live pricing loaded';
 
-            serviceSelect.innerHTML = '';
-            
-            const services = Object.keys(data).sort();
-            
-            if(services.length === 0) {
-                serviceSelect.innerHTML = '<option value="">No services available (Configure API key in Admin Settings)</option>';
-                return;
-            }
+            // Populate Popular App Grid prices
+            updatePopularCards();
 
-            // Populate Favorites Group
-            const favGroup = document.createElement('optgroup');
-            favGroup.label = "⭐ Favorites";
-            favoriteServices.forEach(fav => {
-                const match = services.find(s => s.toLowerCase() === fav.toLowerCase());
-                if(match) {
-                    const opt = document.createElement('option');
-                    opt.value = match;
-                    opt.textContent = formatServiceName(match);
-                    opt.className = "font-bold text-[#0d9488]";
-                    favGroup.appendChild(opt);
-                }
-            });
-            if(favGroup.children.length > 0) {
-                serviceSelect.appendChild(favGroup);
-            }
-
-            // Populate All Services Group
-            const allGroup = document.createElement('optgroup');
-            allGroup.label = "All Services";
-            services.forEach(service => {
-                if(!favoriteServices.some(fav => fav.toLowerCase() === service.toLowerCase())) {
-                    const opt = document.createElement('option');
-                    opt.value = service;
-                    opt.textContent = formatServiceName(service);
-                    allGroup.appendChild(opt);
-                }
-            });
-            if(allGroup.children.length > 0) {
-                serviceSelect.appendChild(allGroup);
-            }
-
-            serviceSelect.disabled = false;
+            // Enable search
             serviceSearch.disabled = false;
-            serviceSearch.value = '';
+
+            // If an app is already selected, re-calculate its price
+            if (selectedServiceKey && currentServicesData[selectedServiceKey]) {
+                selectAppCard(selectedServiceKey, false);
+            } else {
+                // Auto-select WhatsApp by default if available
+                if (currentServicesData['whatsapp']) {
+                    selectAppCard('whatsapp', false);
+                }
+            }
         } catch (error) {
-            console.error('Error loading services', error);
-            showAlert('Failed to load services for provider. Please try again.', true);
+            console.error('Error loading services:', error);
+            serviceLoadingIndicator.textContent = 'Error loading services';
+            showNotification('Could not load services. Please retry.', '⚠️');
         }
     }
 
-    function renderOperators(service, preserveOperator = null) {
-        operatorSelect.innerHTML = '<option value="">Select an Operator</option>';
-        selectedBasePrice = 0;
-        selectedPrice = 0;
-        priceDisplay.textContent = `${currencySymbol}0.00`;
-        buyBtn.disabled = true;
+    function updatePopularCards() {
+        if (!currentServicesData) return;
 
-        if (!service || !currentServicesData || !currentServicesData[service]) {
-            operatorSelect.disabled = true;
+        document.querySelectorAll('.app-card').forEach(card => {
+            const serviceKey = card.id.replace('appCard-', '');
+            const priceBadge = card.querySelector('.app-price-badge');
+            const countBadge = card.querySelector('.app-count-badge');
+
+            if (currentServicesData[serviceKey]) {
+                const opKeys = Object.keys(currentServicesData[serviceKey]);
+                const firstOp = opKeys[0] ? currentServicesData[serviceKey][opKeys[0]] : null;
+                if (firstOp) {
+                    const cost = calculateEffectivePrice(firstOp.cost, serviceKey);
+                    priceBadge.textContent = `${currencySymbol}${(cost * currencyFx).toFixed(2)}`;
+                    countBadge.textContent = `${firstOp.count || '99+'} avail`;
+                    card.classList.remove('opacity-40');
+                }
+            } else {
+                priceBadge.textContent = 'Unavailable';
+                countBadge.textContent = '';
+                card.classList.add('opacity-40');
+            }
+        });
+    }
+
+    function calculateEffectivePrice(rawBase, serviceKey) {
+        const mult = premiumMultiplier();
+        const currentCountry = (getSelectedProvider() === 'daisysms') ? 'usa' : (countrySelect.value || '').toLowerCase();
+        let effective = round2(parseFloat(rawBase) * mult);
+
+        const ngnRate = currencyFx > 1 ? currencyFx : 1500;
+        if ((currentCountry === 'singapore' || currentCountry === 'sg') && (serviceKey === 'whatsapp' || serviceKey === 'wa')) {
+            effective = round2(20000 / ngnRate);
+        } else if ((effective * ngnRate) < 1000) {
+            effective = round2(1500 / ngnRate);
+        }
+        return effective;
+    }
+
+    function selectAppCard(serviceKey, announce = true) {
+        if (!currentServicesData || !currentServicesData[serviceKey]) {
+            if (announce) showNotification('Service currently unavailable for this destination.', '⚠️');
             return;
         }
 
-        const operators = Object.keys(currentServicesData[service]);
-        const mult = premiumMultiplier();
-        const currentCountry = (countrySelect.value || '').toLowerCase();
-        const currentService = (service || '').toLowerCase();
+        selectedServiceKey = serviceKey;
+        serviceSelect.value = serviceKey;
 
-        operators.forEach(op => {
-            const details = currentServicesData[service][op];
-            if (details.count > 0) {
-                const base = parseFloat(details.cost);
-                let effective = round2(base * mult);
+        // Highlight selected app card & remove previous highlights
+        document.querySelectorAll('.app-card').forEach(c => {
+            c.classList.remove('border-[#0d9488]', 'bg-teal-50/60', 'ring-2', 'ring-[#0d9488]/40');
+        });
+        const activeCard = document.getElementById(`appCard-${serviceKey}`);
+        if (activeCard) {
+            activeCard.classList.add('border-[#0d9488]', 'bg-teal-50/60', 'ring-2', 'ring-[#0d9488]/40');
+        }
 
-                // Enforce price rules: Singapore WhatsApp = 20,000 NGN, any service < 1000 NGN = 1500 NGN
-                const ngnRate = currencyFx > 1 ? currencyFx : 1500;
-                if ((currentCountry === 'singapore' || currentCountry === 'sg') && (currentService === 'whatsapp' || currentService === 'wa')) {
-                    effective = round2(20000 / ngnRate);
-                } else if ((effective * ngnRate) < 1000) {
-                    effective = round2(1500 / ngnRate);
+        // Close search results dropdown
+        serviceSearchResults.classList.add('hidden');
+        serviceSearch.value = formatServiceName(serviceKey);
+
+        // Update Summary Bar
+        summaryAppIcon.textContent = getAppIcon(serviceKey);
+        summaryAppName.textContent = formatServiceName(serviceKey);
+
+        // Populate Operators and Auto-Select First/Cheapest
+        renderOperators(serviceKey);
+    }
+
+    function renderOperators(serviceKey) {
+        operatorSelect.innerHTML = '';
+        const serviceData = currentServicesData[serviceKey];
+        if (!serviceData) return;
+
+        const operators = Object.keys(serviceData);
+        let bestPrice = 0;
+        let bestRaw = 0;
+        let totalCount = 0;
+
+        operators.forEach((op, idx) => {
+            const details = serviceData[op];
+            if (details.count > 0 || idx === 0) {
+                totalCount += (details.count || 0);
+                const effective = calculateEffectivePrice(details.cost, serviceKey);
+
+                if (idx === 0) {
+                    bestPrice = effective;
+                    bestRaw = parseFloat(details.cost);
                 }
 
                 const opt = document.createElement('option');
                 opt.value = op;
-                opt.dataset.basePrice = String(base);
+                opt.dataset.basePrice = String(details.cost);
                 opt.dataset.price = String(effective);
-                opt.textContent = `${op} - ${currencySymbol}${(effective * currencyFx).toFixed(2)} (${details.count} available)${isPremiumSelected() ? ' (Premium)' : ''}`;
+                opt.textContent = `${op === 'any' ? 'Any / Best Available' : op} - ${currencySymbol}${(effective * currencyFx).toFixed(2)}`;
                 operatorSelect.appendChild(opt);
             }
         });
 
-        operatorSelect.disabled = false;
-        if (preserveOperator && Array.from(operatorSelect.options).some(opt => opt.value === preserveOperator)) {
-            operatorSelect.value = preserveOperator;
-            operatorSelect.dispatchEvent(new Event('change'));
-        } else if (operatorSelect.options.length > 1) {
-            operatorSelect.selectedIndex = 1;
-            operatorSelect.dispatchEvent(new Event('change'));
+        // Auto select first option
+        if (operatorSelect.options.length > 0) {
+            operatorSelect.selectedIndex = 0;
+            selectedBasePrice = bestRaw;
+            selectedPrice = bestPrice;
+        }
+
+        summaryStock.textContent = `${totalCount || 'Multiple'} numbers available in pool`;
+        updatePriceAndButton();
+    }
+
+    function updatePriceAndButton() {
+        const finalPrice = selectedPrice;
+        const finalConverted = finalPrice * currencyFx;
+        priceDisplay.textContent = `${currencySymbol}${finalConverted.toFixed(2)}`;
+
+        // Check if user has sufficient balance
+        if (userWalletBalance < finalPrice) {
+            buyBtn.disabled = true;
+            buyBtn.innerHTML = `<span>⚠️ Low Balance (${currencySymbol}${(userWalletBalance * currencyFx).toFixed(2)})</span>`;
+            buyBtn.title = "Please top up your wallet to continue.";
+        } else {
+            buyBtn.disabled = false;
+            buyBtn.innerHTML = `<span>⚡ Get Phone Number (${currencySymbol}${finalConverted.toFixed(2)})</span>`;
+            buyBtn.title = "";
         }
     }
 
-    // Provider choice listener
-    document.querySelectorAll('input[name="sms_provider_choice"]').forEach(radio => {
-        radio.addEventListener('change', () => {
+    // Search Box Autocomplete for 150+ apps
+    serviceSearch.addEventListener('input', (e) => {
+        const query = e.target.value.trim().toLowerCase();
+        if (!currentServicesData || query.length === 0) {
+            serviceSearchResults.classList.add('hidden');
+            return;
+        }
+
+        const matches = Object.keys(currentServicesData).filter(s => {
+            return s.toLowerCase().includes(query) || formatServiceName(s).toLowerCase().includes(query);
+        });
+
+        if (matches.length === 0) {
+            serviceSearchResults.innerHTML = '<div class="p-4 text-center text-xs text-gray-500">No services match your search.</div>';
+            serviceSearchResults.classList.remove('hidden');
+            return;
+        }
+
+        serviceSearchResults.innerHTML = '';
+        matches.slice(0, 15).forEach(s => {
+            const firstOp = Object.values(currentServicesData[s])[0];
+            const cost = firstOp ? calculateEffectivePrice(firstOp.cost, s) : 0;
+            const row = document.createElement('div');
+            row.className = 'p-3 hover:bg-teal-50 cursor-pointer flex items-center justify-between text-xs transition';
+            row.innerHTML = `
+                <div class="flex items-center gap-2.5">
+                    <span class="text-base">${getAppIcon(s)}</span>
+                    <span class="font-bold text-gray-900">${formatServiceName(s)}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 font-medium">${firstOp?.count || '99+'} avail</span>
+                    <span class="font-black text-[#0d9488]">${currencySymbol}${(cost * currencyFx).toFixed(2)}</span>
+                </div>
+            `;
+            row.addEventListener('click', () => {
+                selectAppCard(s);
+            });
+            serviceSearchResults.appendChild(row);
+        });
+
+        serviceSearchResults.classList.remove('hidden');
+    });
+
+    // Close search dropdown on click outside
+    document.addEventListener('click', (e) => {
+        if (!serviceSearch.contains(e.target) && !serviceSearchResults.contains(e.target)) {
+            serviceSearchResults.classList.add('hidden');
+        }
+    });
+
+    // Listeners for destination radio
+    document.querySelectorAll('input[name="sms_provider_choice"]').forEach(r => {
+        r.addEventListener('change', () => {
             loadServices();
         });
     });
 
-    // Service search filter
-    serviceSearch.addEventListener('input', (e) => {
-        const searchTerm = e.target.value.toLowerCase();
-        const options = serviceSelect.querySelectorAll('option');
-        
-        options.forEach(option => {
-            if(option.value === "") return;
-            const text = option.textContent.toLowerCase();
-            
-            if(text.includes(searchTerm)) {
-                option.style.display = '';
-            } else {
-                option.style.display = 'none';
-            }
-        });
-    });
-
-    countrySelect.addEventListener('change', loadServices);
-
-    serviceSelect.addEventListener('change', (e) => {
-        const service = e.target.value;
-        renderOperators(service);
+    countrySelect.addEventListener('change', () => {
+        loadServices();
     });
 
     operatorSelect.addEventListener('change', (e) => {
-        const selectedOption = e.target.options[e.target.selectedIndex];
-        if (selectedOption.value) {
-            selectedBasePrice = parseFloat(selectedOption.dataset.basePrice || selectedOption.dataset.price || '0');
-            selectedPrice = parseFloat(selectedOption.dataset.price || '0');
-            if (!Number.isFinite(selectedPrice) || selectedPrice <= 0) {
-                selectedPrice = round2(selectedBasePrice * premiumMultiplier());
-            }
-            priceDisplay.textContent = `${currencySymbol}${(selectedPrice * currencyFx).toFixed(2)}`;
-            buyBtn.disabled = false;
-        } else {
-            selectedBasePrice = 0;
-            selectedPrice = 0;
-            priceDisplay.textContent = `${currencySymbol}0.00`;
-            buyBtn.disabled = true;
+        const opt = e.target.options[e.target.selectedIndex];
+        if (opt && opt.dataset.price) {
+            selectedBasePrice = parseFloat(opt.dataset.basePrice || '0');
+            selectedPrice = parseFloat(opt.dataset.price || '0');
+            updatePriceAndButton();
         }
     });
 
     if (premiumToggle) {
         premiumToggle.addEventListener('change', () => {
-            const service = serviceSelect.value;
-            if (service) {
-                renderOperators(service, operatorSelect.value);
+            if (selectedServiceKey) {
+                renderOperators(selectedServiceKey);
             }
-            if (selectedBasePrice > 0) {
-                selectedPrice = round2(selectedBasePrice * premiumMultiplier());
-                priceDisplay.textContent = `${currencySymbol}${(selectedPrice * currencyFx).toFixed(2)}`;
-                buyBtn.disabled = false;
-            }
+            updatePopularCards();
         });
     }
 
+    // Purchase Button Handler
     buyBtn.addEventListener('click', async () => {
+        if (!selectedServiceKey) {
+            showNotification('Please select a service first.', '⚠️');
+            return;
+        }
+
         buyBtn.disabled = true;
-        buyBtn.innerHTML = '<span class="inline-flex items-center gap-2"><svg class="animate-spin h-4 w-4 text-black" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Processing...</span>';
+        buyBtn.innerHTML = `
+            <svg class="animate-spin h-4 w-4 text-gray-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span>Allocating Number...</span>
+        `;
+
+        const provider = getSelectedProvider();
+        const country = (provider === 'daisysms') ? 'usa' : (countrySelect.value || 'usa');
+        const formattedService = formatServiceName(selectedServiceKey);
+
+        if (window.showAppLoader) {
+            window.showAppLoader(
+                'Securing Private Line...', 
+                `Allocating verified ${formattedService} line (${provider === 'daisysms' ? 'USA 🇺🇸' : country.toUpperCase()})`
+            );
+        }
 
         try {
             const response = await fetch('/api/sms/buy', {
@@ -602,12 +1029,12 @@
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
                 },
                 body: JSON.stringify({
-                    provider: getSelectedProvider(),
-                    country: countrySelect.value,
-                    product: serviceSelect.value,
-                    operator: operatorSelect.value,
+                    provider: provider,
+                    country: country,
+                    product: selectedServiceKey,
+                    operator: operatorSelect.value || 'any',
                     price: selectedPrice,
-                    promo_code: promoCodeInput ? promoCodeInput.value : '',
+                    promo_code: promoCodeInput ? promoCodeInput.value.trim() : '',
                     is_premium: isPremiumSelected()
                 })
             });
@@ -615,22 +1042,26 @@
             const result = await response.json();
 
             if (result.success) {
-                showAlert(result.message);
-                setTimeout(() => location.reload(), 1500);
+                if (window.showAppLoader) {
+                    window.showAppLoader('Line Secured! 🎉', 'Setting up your live verification tracker...');
+                }
+                showNotification('Number purchased successfully! Redirecting...', '🎉');
+                setTimeout(() => location.reload(), 1200);
             } else {
-                showAlert(result.message, true);
+                if (window.hideAppLoader) window.hideAppLoader();
+                showNotification(result.message || 'Purchase failed.', '❌');
                 buyBtn.disabled = false;
-                buyBtn.textContent = 'Get Phone Number';
+                updatePriceAndButton();
             }
         } catch (error) {
-            showAlert('An error occurred during purchase.', true);
+            if (window.hideAppLoader) window.hideAppLoader();
+            showNotification('Network error during purchase.', '❌');
             buyBtn.disabled = false;
-            buyBtn.textContent = 'Get Phone Number';
+            updatePriceAndButton();
         }
     });
 
-    // Initial load
-    loadServices();
+    // Initialize Alpine & Polling Checker
     document.addEventListener('alpine:init', () => {
         Alpine.data('smsChecker', (orderId, initialStatus, createdTs) => ({
             orderId: orderId,
@@ -716,18 +1147,13 @@
                         this.showCountdown = false;
                         clearInterval(this.intervalId);
                         if (this.countdownId) clearInterval(this.countdownId);
-                        showAlert('Order canceled and refunded successfully.', true);
+                        showNotification('Order canceled & refunded.', '🔄');
                         setTimeout(() => location.reload(), 1200);
                     } else {
                         this.cancelError = (data && data.message) ? data.message : 'Could not cancel this order.';
-                        if (this.cancelError && /expired/i.test(this.cancelError)) {
-                            this.canCancel = false;
-                            this.showCountdown = false;
-                        }
                     }
                 } catch (error) {
-                    console.error('Cancel error:', error);
-                    this.cancelError = 'Network error while canceling. Please refresh and try again.';
+                    this.cancelError = 'Network error while canceling.';
                 } finally {
                     this.canceling = false;
                 }
@@ -759,34 +1185,32 @@
                         this.showCountdown = false;
                         clearInterval(this.intervalId);
                         if (this.countdownId) clearInterval(this.countdownId);
-                        showAlert(`SMS Received! Code: ${this.smsCode}`);
-                        setTimeout(() => location.reload(), 1500);
+                        playOtpArrivalChime();
+                        showNotification(`SMS Received! Code: ${this.smsCode}`, '🎉');
                     } else if (s === 'CANCELED' || s === 'CANCELLED' || s === 'TIMEOUT') {
                         this.status = 'CANCELED';
                         this.canCancel = false;
                         this.showCountdown = false;
                         clearInterval(this.intervalId);
                         if (this.countdownId) clearInterval(this.countdownId);
-                        showAlert('Order was canceled and refunded.', true);
+                        showNotification('Order was canceled and refunded.', 'ℹ️');
                         setTimeout(() => location.reload(), 1500);
                     } else {
                         this.pollingMsg = 'Waiting for SMS...';
                     }
                 } catch (error) {
-                    console.error('Error polling SMS status:', error);
-                    this.pollingMsg = 'Connection issue… retrying';
+                    this.pollingMsg = 'Reconnecting...';
                 }
             },
 
             copyCode() {
                 if (!this.smsCode) return;
-                const v = String(this.smsCode);
-                if (navigator.clipboard && navigator.clipboard.writeText) {
-                    navigator.clipboard.writeText(v).catch(() => {});
-                }
-                showAlert(`Copied code: ${v}`);
+                copyTextToClipboard(String(this.smsCode), `Copied OTP Code: ${this.smsCode}`);
             }
         }));
     });
+
+    // Initial Load on page start
+    loadServices();
 </script>
 @endsection

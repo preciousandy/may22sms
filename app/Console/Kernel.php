@@ -14,6 +14,8 @@ class Kernel extends ConsoleKernel
     {
         $schedule->command('boost:sync-services')->hourly()->withoutOverlapping();
         $schedule->command('app:sync-football-matches --days=7')->daily()->withoutOverlapping();
+        $schedule->command('savings:accrue-interest')->dailyAt('00:05')->withoutOverlapping();
+        $schedule->command('savings:process-maturity')->dailyAt('00:15')->withoutOverlapping();
     }
 
     /**
