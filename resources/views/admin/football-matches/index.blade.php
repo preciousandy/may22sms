@@ -5,23 +5,72 @@
     Football Matches
 @endpush
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
+    <div>
+        <div class="flex items-center gap-2">
             <h2 class="text-2xl font-extrabold text-gray-900">Football Matches</h2>
-            <div class="text-sm font-bold text-gray-500">Manage and display this week's matches</div>
+            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-teal-50 text-teal-700 border border-teal-200">
+                LIVE &amp; FIXTURES
+            </span>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <form method="POST" action="/admin/football-matches/sync" onsubmit="return confirm('Are you sure you want to sync matches from football-data.org? This will replace all existing matches.');">
-                @csrf
-                <button type="submit" class="inline-flex items-center rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white px-4 py-2 text-sm font-extrabold transition">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Sync from API
-                </button>
-            </form>
-            <a href="/admin/dashboard" class="inline-flex items-center rounded-xl bg-gray-100 px-4 py-2 text-sm font-extrabold text-gray-900 hover:bg-gray-200 transition">Dashboard</a>
+        <div class="text-sm font-bold text-gray-500 mt-0.5">Manage live schedules, automated football-data sync, and scores</div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+        <!-- Sync Settings Button -->
+        <button type="button" onclick="document.getElementById('sync-settings-dialog').showModal()" class="inline-flex items-center rounded-xl bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 text-sm font-extrabold shadow-sm transition active:scale-95">
+            <svg class="w-4 h-4 mr-2 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+            </svg>
+            Sync Settings
+        </button>
+
+        <!-- Sync from API Button -->
+        <form method="POST" action="/admin/football-matches/sync" onsubmit="return confirm('Sync upcoming matches from football-data.org? This will refresh active schedules.');">
+            @csrf
+            <button type="submit" class="inline-flex items-center rounded-xl bg-[#0d9488] hover:bg-[#0f766e] text-white px-4 py-2 text-sm font-extrabold shadow-sm transition active:scale-95">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Sync Now ({{ $syncDays }}d)
+            </button>
+        </form>
+
+        <a href="/football-matches" target="_blank" class="inline-flex items-center rounded-xl bg-gray-100 px-3.5 py-2 text-sm font-extrabold text-gray-700 hover:bg-gray-200 transition">
+            View Live Page ↗
+        </a>
+    </div>
+</div>
+
+<!-- Sync Status Overview Card -->
+<div class="mb-6 p-4 rounded-2xl border {{ empty($apiToken) ? 'bg-amber-50 border-amber-200' : 'bg-slate-900 border-slate-800 text-white shadow-sm' }} flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+    <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl {{ empty($apiToken) ? 'bg-amber-200 text-amber-800' : 'bg-teal-500/20 text-teal-400 border border-teal-500/30' }} flex items-center justify-center text-lg shrink-0">
+            {{ empty($apiToken) ? '⚠️' : '⚽' }}
+        </div>
+        <div>
+            @if(empty($apiToken))
+                <div class="text-sm font-black text-amber-900">Football API Key Missing</div>
+                <div class="text-xs font-semibold text-amber-700">Click &ldquo;Sync Settings&rdquo; to input your free Football-Data.org API key to enable match synchronization.</div>
+            @else
+                <div class="text-sm font-black text-white flex items-center gap-2">
+                    <span>Football-Data.org API Active</span>
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                </div>
+                <div class="text-xs text-slate-300 mt-0.5">
+                    Sync Range: <span class="font-bold text-teal-400">{{ $syncDays }} Days</span>
+                    &bull; Auto-Sync: <span class="font-bold {{ $autoSync ? 'text-emerald-400' : 'text-slate-400' }}">{{ $autoSync ? 'Enabled (Daily 00:00)' : 'Disabled' }}</span>
+                    @if($lastSyncAt)
+                        &bull; Last synced: <span class="text-slate-200 font-bold">{{ \Carbon\Carbon::parse($lastSyncAt)->diffForHumans() }}</span> ({{ $lastSyncCount ?? 0 }} matches)
+                    @endif
+                </div>
+            @endif
         </div>
     </div>
+    <div>
+        <button type="button" onclick="document.getElementById('sync-settings-dialog').showModal()" class="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 rounded-xl text-xs font-black {{ empty($apiToken) ? 'bg-amber-600 text-white hover:bg-amber-700' : 'bg-white/10 text-white hover:bg-white/20 border border-white/20' }} transition">
+            ⚙️ Configure Settings
+        </button>
+    </div>
+</div>
 
 @if(session('success'))
     <div class="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl shadow-sm">
@@ -252,4 +301,97 @@
     </div>
 </dialog>
 @endforeach
+
+<!-- SYNC SETTINGS DIALOG -->
+<dialog id="sync-settings-dialog" class="rounded-2xl p-0 w-full max-w-lg shadow-2xl backdrop:bg-black/60 border-0 overflow-hidden">
+    <div class="bg-white" x-data="{ showToken: false }">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-900 text-white">
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 border border-teal-500/30 flex items-center justify-center font-black text-base">
+                    ⚙️
+                </div>
+                <div>
+                    <h3 class="text-base font-black text-white">Football Sync Settings</h3>
+                    <p class="text-[11px] text-slate-400">Configure Football-Data.org API and synchronization</p>
+                </div>
+            </div>
+            <form method="dialog">
+                <button type="submit" class="text-slate-400 hover:text-white transition p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </form>
+        </div>
+
+        <form method="POST" action="/admin/football-matches/settings" class="p-6 space-y-4">
+            @csrf
+
+            <!-- API Token -->
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <label class="block text-xs font-black uppercase tracking-wider text-gray-700">Football-Data.org API Token</label>
+                    <a href="https://www.football-data.org/client/register" target="_blank" class="text-xs font-bold text-[#0d9488] hover:underline flex items-center gap-1">
+                        Get free token ↗
+                    </a>
+                </div>
+                <div class="relative">
+                    <input :type="showToken ? 'text' : 'password'" 
+                           name="football_data_api_token" 
+                           value="{{ old('football_data_api_token', $apiToken) }}" 
+                           placeholder="e.g. 9f8a7b6c5d4e3f2a1b0c..."
+                           class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 pr-20 text-sm font-mono focus:ring-0 focus:border-[#0d9488]">
+                    <button type="button" 
+                            @click="showToken = !showToken" 
+                            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600">
+                        <span x-text="showToken ? 'Hide' : 'Show'"></span>
+                    </button>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">
+                    Sign up on <a href="https://www.football-data.org" target="_blank" class="underline font-bold text-gray-700">football-data.org</a> for free to get an API key.
+                </p>
+            </div>
+
+            <!-- Sync Days Range -->
+            <div>
+                <label class="block text-xs font-black uppercase tracking-wider text-gray-700 mb-1.5">Sync Range (Days Ahead)</label>
+                <select name="football_sync_days" class="w-full rounded-xl border border-gray-200 px-3.5 py-2.5 text-sm font-bold focus:ring-0 focus:border-[#0d9488]">
+                    <option value="1" {{ (int) old('football_sync_days', $syncDays) === 1 ? 'selected' : '' }}>1 Day (Today &amp; Tomorrow)</option>
+                    <option value="3" {{ (int) old('football_sync_days', $syncDays) === 3 ? 'selected' : '' }}>3 Days (Next 72 Hours)</option>
+                    <option value="7" {{ (int) old('football_sync_days', $syncDays) === 7 ? 'selected' : '' }}>7 Days (Upcoming Week - Recommended)</option>
+                    <option value="14" {{ (int) old('football_sync_days', $syncDays) === 14 ? 'selected' : '' }}>14 Days (Next 2 Weeks)</option>
+                    <option value="30" {{ (int) old('football_sync_days', $syncDays) === 30 ? 'selected' : '' }}>30 Days (Full Month)</option>
+                </select>
+                <p class="text-[11px] text-gray-500 mt-1">Determines how many days of upcoming matches are fetched into the database.</p>
+            </div>
+
+            <!-- Auto-Sync Toggle -->
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-start gap-3">
+                <input type="checkbox" 
+                       name="football_auto_sync_enabled" 
+                       id="football_auto_sync_enabled" 
+                       value="1" 
+                       {{ old('football_auto_sync_enabled', $autoSync) ? 'checked' : '' }} 
+                       class="h-4 w-4 rounded border-gray-300 text-[#0d9488] focus:ring-[#0d9488] mt-0.5">
+                <label for="football_auto_sync_enabled" class="cursor-pointer">
+                    <span class="block text-xs font-black text-gray-800">Enable Automated Daily Sync</span>
+                    <span class="block text-[11px] text-gray-500">When enabled, the server cron job automatically synchronizes upcoming fixtures every night at 00:00.</span>
+                </label>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-gray-100">
+                <button type="submit" name="action" value="save" class="flex-1 bg-slate-900 hover:bg-slate-800 text-white py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider transition">
+                    Save Settings
+                </button>
+                <button type="submit" name="action" value="save_and_sync" class="flex-1 bg-[#0d9488] hover:bg-[#0f766e] text-white py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-wider shadow-md shadow-teal-600/20 transition">
+                    Save &amp; Sync Now ⚡
+                </button>
+                <form method="dialog" class="sm:w-auto">
+                    <button type="submit" class="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 py-2.5 px-4 rounded-xl font-bold text-xs transition">
+                        Cancel
+                    </button>
+                </form>
+            </div>
+        </form>
+    </div>
+</dialog>
 @endsection

@@ -352,6 +352,11 @@ x-init="
                         Promo Codes
                     </a>
                 @endif
+
+                <a href="/admin/football-matches" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/football-matches') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                    <span class="mr-3 text-base">⚽</span>
+                    Live Football
+                </a>
             </nav>
         </div>
 

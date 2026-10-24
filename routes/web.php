@@ -327,6 +327,7 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::get('/football-matches', [\App\Http\Controllers\Admin\FootballMatchController::class, 'index']);
     Route::post('/football-matches', [\App\Http\Controllers\Admin\FootballMatchController::class, 'store']);
     Route::post('/football-matches/sync', [\App\Http\Controllers\Admin\FootballMatchController::class, 'sync']);
+    Route::post('/football-matches/settings', [\App\Http\Controllers\Admin\FootballMatchController::class, 'updateSettings']);
     Route::post('/football-matches/{id}', [\App\Http\Controllers\Admin\FootballMatchController::class, 'update']);
     Route::delete('/football-matches/{id}', [\App\Http\Controllers\Admin\FootballMatchController::class, 'destroy']);
 

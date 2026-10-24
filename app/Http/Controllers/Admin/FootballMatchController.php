@@ -8,6 +8,8 @@ use App\Services\FootballDataService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
+use App\Models\Setting;
+
 class FootballMatchController extends Controller
 {
     public function index(Request $request)
@@ -27,8 +29,15 @@ class FootballMatchController extends Controller
 
         $matches = $query->paginate(20)->withQueryString();
 
-        return view('admin.football-matches.index', compact('matches', 'q'));
+        $apiToken = Setting::where('key', 'football_data_api_token')->value('value') ?: (string) config('football-data.api_token', '');
+        $syncDays = (int) (Setting::where('key', 'football_sync_days')->value('value') ?? 7);
+        $autoSync = (int) (Setting::where('key', 'football_auto_sync_enabled')->value('value') ?? 1) === 1;
+        $lastSyncAt = Setting::where('key', 'football_last_sync_at')->value('value');
+        $lastSyncCount = Setting::where('key', 'football_last_sync_count')->value('value');
+
+        return view('admin.football-matches.index', compact('matches', 'q', 'apiToken', 'syncDays', 'autoSync', 'lastSyncAt', 'lastSyncCount'));
     }
+
 
     public function store(Request $request)
     {
@@ -101,12 +110,53 @@ class FootballMatchController extends Controller
         return back()->with('success', 'Match deleted successfully.');
     }
 
-    public function sync(FootballDataService $service)
+    public function updateSettings(Request $request, FootballDataService $service)
     {
-        $data = $service->getUpcomingMatches(7);
+        $request->validate([
+            'football_data_api_token' => 'nullable|string|max:255',
+            'football_sync_days' => 'required|integer|min:1|max:30',
+            'football_auto_sync_enabled' => 'nullable|in:0,1',
+        ]);
+
+        Setting::updateOrCreate(
+            ['key' => 'football_data_api_token'],
+            ['value' => trim((string) $request->input('football_data_api_token', ''))]
+        );
+
+        Setting::updateOrCreate(
+            ['key' => 'football_sync_days'],
+            ['value' => (string) $request->input('football_sync_days', '7')]
+        );
+
+        Setting::updateOrCreate(
+            ['key' => 'football_auto_sync_enabled'],
+            ['value' => $request->has('football_auto_sync_enabled') ? '1' : '0']
+        );
+
+        if ($request->input('action') === 'save_and_sync') {
+            return $this->sync($request, new FootballDataService());
+        }
+
+        return back()->with('success', 'Football sync settings updated successfully.');
+    }
+
+    public function sync(Request $request, FootballDataService $service)
+    {
+        $configuredDays = (int) (Setting::where('key', 'football_sync_days')->value('value') ?? 7);
+        $days = (int) ($request->input('days') ?: $configuredDays);
+        if ($days < 1 || $days > 30) {
+            $days = 7;
+        }
+
+        $data = $service->getUpcomingMatches($days);
+
+        if (isset($data['error']) && $data['error']) {
+            return back()->with('error', 'Sync Failed: ' . ($data['message'] ?? 'Could not communicate with football-data.org API. Check your API token.'));
+        }
 
         if (!isset($data['matches']) || !is_array($data['matches'])) {
-            return back()->with('error', 'No matches found or API error.');
+            $msg = $data['message'] ?? 'No match data returned from football-data.org.';
+            return back()->with('error', 'Sync Warning: ' . $msg);
         }
 
         DB::transaction(function () use ($data) {
@@ -134,6 +184,9 @@ class FootballMatchController extends Controller
 
         $count = count($data['matches']);
 
-        return back()->with('success', "Successfully synced {$count} matches!");
+        Setting::updateOrCreate(['key' => 'football_last_sync_at'], ['value' => now()->toDateTimeString()]);
+        Setting::updateOrCreate(['key' => 'football_last_sync_count'], ['value' => (string) $count]);
+
+        return back()->with('success', "Successfully synced {$count} matches for the next {$days} days!");
     }
 }
