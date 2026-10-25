@@ -207,6 +207,14 @@ class SmsController extends Controller
 
     public function buyNumber(Request $request, WalletService $wallet)
     {
+        $serviceManager = app(\App\Services\ServiceManager::class);
+        if (!$serviceManager->isAvailable('sms_verify')) {
+            return response()->json([
+                'success' => false,
+                'message' => $serviceManager->getMaintenanceMessage('sms_verify'),
+            ], 403);
+        }
+
         $request->validate([
             'provider' => 'nullable|string',
             'country' => 'required|string',

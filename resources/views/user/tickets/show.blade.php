@@ -105,7 +105,7 @@
                 <div class="flex flex-col {{ $m->is_admin ? 'items-start' : 'items-end' }}">
                     <div class="flex items-center gap-2 mb-1 px-1">
                         <span class="text-[11px] font-extrabold {{ $m->is_admin ? 'text-teal-700' : 'text-gray-500' }}">
-                            {{ $m->is_admin ? '🛡️ Admin Support' : 'You' }}
+                            {{ $m->is_admin ? 'May22SMS Support' : 'You' }}
                         </span>
                         <span class="text-[11px] text-gray-400">• {{ $m->created_at->format('M d, Y H:i') }}</span>
                     </div>

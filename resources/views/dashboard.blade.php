@@ -76,7 +76,9 @@
                 <!-- Account ID Badge with 1-Click Copy -->
                 <button type="button" @click="copyId('{{ auth()->user()->id }}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xs border border-white/15 text-xs font-mono font-bold text-teal-100 transition cursor-pointer">
                     <span>ID: #{{ auth()->user()->id }}</span>
-                    <span x-show="!copiedId" class="text-[10px] text-teal-300">📋</span>
+                    <span x-show="!copiedId" class="text-teal-300">
+                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    </span>
                     <span x-show="copiedId" style="display:none;" class="text-[10px] text-amber-300 font-sans font-bold">Copied!</span>
                 </button>
             </div>
@@ -128,7 +130,7 @@
 
                 <!-- Save Small Small Shortcut -->
                 <a href="/savings" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500/80 to-teal-600/80 hover:from-emerald-500 hover:to-teal-600 backdrop-blur-xs text-white font-bold text-xs sm:text-sm transition-transform active:scale-95 shrink-0 border border-emerald-400/30 shadow-sm">
-                    <span>💰</span>
+                    <svg class="w-4 h-4 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Save Small Small</span>
                     <span class="text-[9px] font-black uppercase bg-[#facc15] text-slate-950 px-1.5 py-0.2 rounded-md">16.9%</span>
                 </a>
@@ -146,8 +148,8 @@
     <div class="relative overflow-hidden rounded-3xl p-4 sm:p-5 text-white shadow-md border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4"
          style="background: linear-gradient(135deg, #090d16 0%, #0f172a 60%, #0d9488 100%) !important;">
         <div class="flex items-center gap-3.5">
-            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center text-2xl shadow-md shrink-0">
-                🎓
+            <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-400 to-yellow-500 text-slate-950 flex items-center justify-center shadow-md shrink-0">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-5.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/></svg>
             </div>
             <div>
                 <div class="flex items-center gap-2">
@@ -177,33 +179,53 @@
             </a>
         </div>
 
+        @php
+            $svcMgr = app(\App\Services\ServiceManager::class);
+        @endphp
+
         <div class="grid grid-cols-4 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-6 xl:grid-cols-12 gap-3 sm:gap-4">
             
             <!-- Tile 1: SMS Verification -->
-            <a href="/sms-verify" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
-                <span class="absolute top-1 right-2 bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
-                    HOT
-                </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-[#0d9488] text-white flex items-center justify-center text-2xl shadow-md shadow-teal-500/20 group-hover:scale-110 transition-transform mb-2">
-                    📱
+            <a href="/sms-verify" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('sms_verify') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('sms_verify'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @else
+                    <span class="absolute top-1 right-2 bg-gradient-to-r from-teal-500 to-emerald-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        HOT
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-[#0d9488] text-white flex items-center justify-center shadow-md shadow-teal-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">SMS Verify</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Virtual No.</span>
             </a>
 
             <!-- Tile 2: Digital Logs -->
-            <a href="/logs-store" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-2xl shadow-md shadow-orange-500/20 group-hover:scale-110 transition-transform mb-2">
-                    📄
+            <a href="/logs-store" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('digital_logs') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('digital_logs'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center shadow-md shadow-orange-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Logs Store</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Accounts</span>
             </a>
 
             <!-- Tile 3: Social Boosting -->
-            <a href="/social-boosting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center text-2xl shadow-md shadow-purple-500/20 group-hover:scale-110 transition-transform mb-2">
-                    🚀
+            <a href="/social-boosting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('boosting') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('boosting'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-purple-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-purple-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7a1.5 1.5 0 11-2.121-2.121 1.5 1.5 0 012.121 2.121z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Social Boost</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Followers</span>
@@ -211,56 +233,83 @@
 
             <!-- Tile 4: Add Money / Fund Wallet -->
             <a href="/funding" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
-                    💳
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-green-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Add Money</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Instant Top-up</span>
             </a>
 
             <!-- Tile 5: Receive Crypto & Convert to Naira (NEW) -->
-            <a href="/services/crypto-to-naira" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
-                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
-                    NEW
-                </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2">
-                    🪙
+            <a href="/services/crypto-to-naira" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('crypto_to_naira') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('crypto_to_naira'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @else
+                    <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                        NEW
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-500 to-yellow-600 text-white flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7v10m-3-7h6a2 2 0 010 4H9m0-4h6"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Receive Crypto</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Convert To Naira</span>
             </a>
 
             <!-- Tile 6: Airtime & Data (NEW) -->
-            <a href="/services/airtime-data" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
-                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
-                    NEW
-                </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
-                    📶
+            @php
+                $vtuDisabled = !$svcMgr->isAvailable('airtime') && !$svcMgr->isAvailable('data');
+            @endphp
+            <a href="/services/airtime-data" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ $vtuDisabled ? 'opacity-75' : '' }}">
+                @if($vtuDisabled)
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @else
+                    <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                        NEW
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Airtime &amp; Data</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">VTU &amp; Bundles</span>
             </a>
 
             <!-- Tile 7: Electricity (NEW) -->
-            <a href="/services/electricity" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
-                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
-                    NEW
-                </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 text-white flex items-center justify-center text-2xl shadow-md shadow-yellow-500/20 group-hover:scale-110 transition-transform mb-2">
-                    ⚡
+            <a href="/services/electricity" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('electricity') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('electricity'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @else
+                    <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                        NEW
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 text-white flex items-center justify-center shadow-md shadow-yellow-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Electricity</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Bills &amp; Tokens</span>
             </a>
 
             <!-- Tile 8: Betting (NEW) -->
-            <a href="/services/betting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
-                <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
-                    NEW
-                </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
-                    🎯
+            <a href="/services/betting" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative {{ !$svcMgr->isAvailable('betting') ? 'opacity-75' : '' }}">
+                @if(!$svcMgr->isAvailable('betting'))
+                    <span class="absolute top-1 right-2 bg-rose-600 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs z-10">
+                        PAUSED
+                    </span>
+                @else
+                    <span class="absolute top-1 right-2 bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
+                        NEW
+                    </span>
+                @endif
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><circle cx="12" cy="12" r="5" stroke-width="2"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Betting</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Fund Wallets</span>
@@ -271,59 +320,59 @@
                 <span class="absolute top-1 right-2 bg-gradient-to-r from-amber-500 to-emerald-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
                     16.9%
                 </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center text-2xl shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
-                    💰
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-700 text-white flex items-center justify-center shadow-md shadow-emerald-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Save Small</span>
                 <span class="text-[10px] font-bold text-emerald-600 mt-0.5">16.9% P.A.</span>
             </a>
 
-            <!-- Tile 9: Daily Gift (With Pulsing Free Badge) -->
+            <!-- Tile 10: Daily Gift (With Pulsing Free Badge) -->
             <a href="#daily-gift" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
                 <span class="absolute top-1 right-2 bg-gradient-to-r from-red-500 to-pink-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-bounce z-10">
                     FREE
                 </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-white flex items-center justify-center text-2xl shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2 opay-gift-bounce">
-                    🎁
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-yellow-500 text-white flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-110 transition-transform mb-2 opay-gift-bounce">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V4a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2zm-8 4h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1zm2 4v6a1 1 0 001 1h10a1 1 0 001-1v-6"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Daily Gift</span>
                 <span class="text-[10px] font-bold text-amber-600 mt-0.5">Streak Bonus</span>
             </a>
 
-            <!-- Tile 9: SportyBet Codes -->
+            <!-- Tile 11: SportyBet Codes -->
             <a href="/sporty-bet-codes" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center text-2xl shadow-md shadow-red-500/20 group-hover:scale-110 transition-transform mb-2">
-                    ⚽
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-red-600 text-white flex items-center justify-center shadow-md shadow-red-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 016.36 15.36M12 3a9 9 0 00-6.36 15.36M12 3v18M3 12h18"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">SportyBet</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Codes &amp; Bets</span>
             </a>
 
-            <!-- Tile 10: Orders History Tracker -->
+            <!-- Tile 12: Orders History Tracker -->
             <a href="/orders" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center text-2xl shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
-                    📦
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">My Orders</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">Live Tracker</span>
             </a>
 
-            <!-- Tile 11: 24/7 Support Desk -->
+            <!-- Tile 13: 24/7 Support Desk -->
             <a href="/tickets" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group">
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 text-white flex items-center justify-center text-2xl shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform mb-2">
-                    🎧
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-500 text-white flex items-center justify-center shadow-md shadow-pink-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 00-14 0v4a3 3 0 003 3h1a1 1 0 001-1v-4a1 1 0 00-1-1H7a5 5 0 0110 0h-2a1 1 0 00-1 1v4a1 1 0 001 1h1a3 3 0 003-3v-4z"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Support</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">24/7 Desk</span>
             </a>
 
-            <!-- Tile 12: Tutorials & How-To Guides (NEW) -->
+            <!-- Tile 14: Tutorials & How-To Guides (NEW) -->
             <a href="/tutorials" class="flex flex-col items-center text-center p-2 rounded-2xl hover:bg-slate-50 transition-all active:scale-95 group relative">
                 <span class="absolute top-1 right-2 bg-gradient-to-r from-teal-500 to-indigo-500 text-white text-[9px] font-black uppercase px-1.5 py-0.2 rounded-full shadow-xs animate-pulse z-10">
                     GUIDE
                 </span>
-                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center text-2xl shadow-md shadow-indigo-500/20 group-hover:scale-110 transition-transform mb-2">
-                    🎓
+                <div class="w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20 group-hover:scale-110 transition-transform mb-2">
+                    <svg class="w-6 h-6 sm:w-7 sm:h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-5.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5l4-2.222"/></svg>
                 </div>
                 <span class="text-xs font-black text-slate-800 leading-tight">Tutorials</span>
                 <span class="text-[10px] font-bold text-slate-400 mt-0.5">How To Use</span>
@@ -341,15 +390,16 @@
             <!-- Header row -->
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-4 border-b border-slate-100">
                 <div class="flex items-center gap-3.5">
-                    <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 flex items-center justify-center text-white text-2xl sm:text-3xl shadow-lg shadow-orange-200 shrink-0"
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 flex items-center justify-center text-white shadow-lg shadow-orange-200 shrink-0"
                          :class="!hasClaimed && !poolExhausted ? 'opay-gift-bounce opay-glow-pulse' : ''">
-                        🎁
+                        <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V4a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2zm-8 4h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1zm2 4v6a1 1 0 001 1h10a1 1 0 001-1v-6"/></svg>
                     </div>
                     <div>
                         <div class="flex flex-wrap items-center gap-2">
                             <h3 class="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Daily Check-In Reward</h3>
                             <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-gradient-to-r from-orange-100 to-amber-100 text-orange-900 border border-orange-200/80 shadow-xs">
-                                🔥 <span x-text="'Day ' + streak + ' Streak'"></span>
+                                <svg class="w-3.5 h-3.5 text-orange-600 inline" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.316.492-.533 1.035-.688 1.587-.197.697-.27 1.408-.258 2.096.02.99.28 1.93.75 2.766-.27-.08-.54-.18-.8-.3a6.002 6.002 0 01-3.13-3.693 1 1 0 00-1.84.52c.115 1.765.815 3.42 1.986 4.673A8.002 8.002 0 0010 18a8.003 8.003 0 007.82-6.273c.27-.894.38-1.826.32-2.753a8.04 8.04 0 00-1.57-4.22 1 1 0 00-1.42-.23c-.32.24-.59.54-.8.88-.42.68-.69 1.45-.8 2.24a4.04 4.04 0 01-.155-2.09 7.02 7.02 0 00-.999-2.999z" clip-rule="evenodd"/></svg>
+                                <span x-text="'Day ' + streak + ' Streak'"></span>
                             </span>
                             <template x-if="!hasClaimed && !poolExhausted">
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase bg-emerald-500 text-white tracking-wider animate-pulse">
@@ -380,7 +430,7 @@
             <!-- Success notification -->
             <div x-show="successMessage" x-transition class="mt-4 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm font-bold flex items-center justify-between shadow-xs">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">🎉</span>
+                    <svg class="w-5 h-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span x-text="successMessage"></span>
                 </div>
                 <button type="button" @click="successMessage = ''" class="text-emerald-700 hover:text-emerald-900 text-xs font-bold underline cursor-pointer">Dismiss</button>
@@ -389,7 +439,7 @@
             <!-- Error notification -->
             <div x-show="errorMessage" x-transition class="mt-4 p-4 rounded-2xl bg-red-50 border border-red-200 text-red-800 text-sm font-semibold flex items-center justify-between shadow-xs">
                 <div class="flex items-center gap-2">
-                    <span class="text-xl">⚠️</span>
+                    <svg class="w-5 h-5 text-red-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     <span x-text="errorMessage"></span>
                 </div>
                 <button type="button" @click="errorMessage = ''" class="text-red-700 hover:text-red-900 text-xs font-bold underline cursor-pointer">Dismiss</button>
@@ -398,7 +448,10 @@
             <!-- Streak Progress Bar -->
             <div class="mt-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50/70 to-orange-50/70 border border-amber-100">
                 <div class="flex items-center justify-between text-xs font-bold mb-1.5">
-                    <span class="text-amber-900 font-black">🔥 7-Day Rewards Ladder</span>
+                    <span class="text-amber-900 font-black flex items-center gap-1.5">
+                        <svg class="w-4 h-4 text-orange-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M12.395 2.553a1 1 0 00-1.45-.385c-.345.23-.614.558-.822.88-.316.492-.533 1.035-.688 1.587-.197.697-.27 1.408-.258 2.096.02.99.28 1.93.75 2.766-.27-.08-.54-.18-.8-.3a6.002 6.002 0 01-3.13-3.693 1 1 0 00-1.84.52c.115 1.765.815 3.42 1.986 4.673A8.002 8.002 0 0010 18a8.003 8.003 0 007.82-6.273c.27-.894.38-1.826.32-2.753a8.04 8.04 0 00-1.57-4.22 1 1 0 00-1.42-.23c-.32.24-.59.54-.8.88-.42.68-.69 1.45-.8 2.24a4.04 4.04 0 01-.155-2.09 7.02 7.02 0 00-.999-2.999z" clip-rule="evenodd"/></svg>
+                        7-Day Rewards Ladder
+                    </span>
                     <span class="text-orange-800" x-text="'Progress: Level ' + streak + ' of 7 (' + Math.round((streak / 7) * 100) + '%)'"></span>
                 </div>
                 <div class="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden">
@@ -422,14 +475,20 @@
                                       :class="(hasClaimed && day <= streak) || (!hasClaimed && day < streak) ? 'text-emerald-800' : (day === streak ? 'text-orange-900 font-black' : 'text-slate-500')"
                                       x-text="'Day ' + day">
                                 </span>
-                                <span class="text-xs" x-text="day === 1 ? '🌱' : (day === 2 ? '🌿' : (day === 3 ? '☘️' : (day === 4 ? '🌻' : (day === 5 ? '🌲' : (day === 6 ? '💎' : '👑')))))"></span>
+                                <span class="text-[9px] font-black uppercase tracking-wider text-slate-400" x-text="'L' + day"></span>
                             </div>
 
                             <div class="py-1">
-                                <div class="text-2xl mb-0.5">
-                                    <span x-show="(hasClaimed && day <= streak) || (!hasClaimed && day < streak)">✅</span>
-                                    <span x-show="!hasClaimed && day === streak" class="opay-gift-bounce inline-block">🎁</span>
-                                    <span x-show="day > streak">🔒</span>
+                                <div class="h-7 flex items-center justify-center mb-0.5">
+                                    <span x-show="(hasClaimed && day <= streak) || (!hasClaimed && day < streak)" class="text-emerald-600">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg>
+                                    </span>
+                                    <span x-show="!hasClaimed && day === streak" class="opay-gift-bounce inline-block text-amber-600">
+                                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V4a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2zm-8 4h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1zm2 4v6a1 1 0 001 1h10a1 1 0 001-1v-6"/></svg>
+                                    </span>
+                                    <span x-show="day > streak" class="text-slate-400">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                                    </span>
                                 </div>
                                 <div class="text-xs font-black text-slate-900 font-mono tracking-tight" x-text="getAmountForDay(day)"></div>
                             </div>
@@ -467,8 +526,12 @@
                     <template x-if="!hasClaimed && !poolExhausted">
                         <button type="button" @click="claimGift()" :disabled="claiming"
                                 class="w-full sm:w-auto px-7 py-3 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white font-black text-xs sm:text-sm shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 transform active:scale-95 disabled:opacity-50 opay-glow-pulse cursor-pointer">
-                            <span x-show="claiming" class="inline-block animate-spin">⌛</span>
-                            <span x-show="!claiming" class="text-base">🎁</span>
+                            <span x-show="claiming" class="inline-block animate-spin">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            </span>
+                            <span x-show="!claiming" class="inline-block">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v13m0-13V4a2 2 0 112 2h-2zm0 0V4a2 2 0 10-2 2h2zm-8 4h16a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1zm2 4v6a1 1 0 001 1h10a1 1 0 001-1v-6"/></svg>
+                            </span>
                             <span x-text="claiming ? 'Claiming Gift...' : 'Claim Day ' + streak + ' Reward (' + getAmountForDay(streak) + ')'"></span>
                         </button>
                     </template>
@@ -482,8 +545,8 @@
         
         <!-- Stat 1: SMS Numbers -->
         <a href="/sms-verify" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-teal-300 transition group">
-            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                📱
+            <div class="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
             </div>
             <div>
                 <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">SMS Numbers</div>
@@ -494,8 +557,8 @@
 
         <!-- Stat 2: Logs Purchased -->
         <a href="/logs-store" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-amber-300 transition group">
-            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                📄
+            <div class="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
             <div>
                 <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Logs Purchased</div>
@@ -506,8 +569,8 @@
 
         <!-- Stat 3: Active Boosts -->
         <a href="/social-boosting" class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-xs flex items-center gap-4 hover:border-purple-300 transition group">
-            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center text-xl shrink-0 group-hover:scale-110 transition-transform">
-                🚀
+            <div class="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7a1.5 1.5 0 11-2.121-2.121 1.5 1.5 0 012.121 2.121z"/></svg>
             </div>
             <div>
                 <div class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Boosts</div>
@@ -657,7 +720,9 @@
                 <div class="mt-4 space-y-2.5">
                     <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
                         <div class="flex items-center gap-2.5">
-                            <span class="text-xl">⚡</span>
+                            <span class="w-8 h-8 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </span>
                             <div>
                                 <div class="text-xs font-black text-slate-800">Bank Transfer / PalmPay</div>
                                 <div class="text-[10px] text-slate-400">Monietude Automated Virtual Account</div>
@@ -668,7 +733,9 @@
 
                     <div class="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100">
                         <div class="flex items-center gap-2.5">
-                            <span class="text-xl">🪙</span>
+                            <span class="w-8 h-8 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shrink-0">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 7v10m-3-7h6a2 2 0 010 4H9m0-4h6"/></svg>
+                            </span>
                             <div>
                                 <div class="text-xs font-black text-slate-800">Cryptocurrency</div>
                                 <div class="text-[10px] text-slate-400">USDT, BTC, ETH, LTC via Cryptomus</div>
@@ -727,13 +794,13 @@
                         
                         <div class="flex items-center gap-3.5 min-w-0">
                             <!-- Category Icon Squircle -->
-                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center text-xl shrink-0 shadow-xs {{ $activity['type'] === 'sms' ? 'bg-blue-50 text-blue-600' : ($activity['type'] === 'boost' ? 'bg-purple-50 text-purple-600' : 'bg-amber-50 text-amber-700') }}">
+                            <div class="w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 shadow-xs {{ $activity['type'] === 'sms' ? 'bg-blue-50 text-blue-600' : ($activity['type'] === 'boost' ? 'bg-purple-50 text-purple-600' : 'bg-amber-50 text-amber-700') }}">
                                 @if($activity['type'] === 'sms')
-                                    📱
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                                 @elseif($activity['type'] === 'boost')
-                                    🚀
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.63 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.58-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7a1.5 1.5 0 11-2.121-2.121 1.5 1.5 0 012.121 2.121z"/></svg>
                                 @else
-                                    📄
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 @endif
                             </div>
 
@@ -778,8 +845,8 @@
         @else
             <!-- OPay Clean Empty State -->
             <div class="p-8 text-center">
-                <div class="w-16 h-16 rounded-full bg-slate-100 mx-auto flex items-center justify-center text-2xl text-slate-400 mb-3">
-                    📋
+                <div class="w-16 h-16 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
                 <h4 class="text-sm font-black text-slate-800">No Transactions Yet</h4>
                 <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">Get started by topping up your balance or grabbing an instant SMS number.</p>

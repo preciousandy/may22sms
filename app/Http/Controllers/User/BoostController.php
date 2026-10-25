@@ -76,6 +76,15 @@ class BoostController extends Controller
 
     public function placeOrder(Request $request, JustAnotherPanelService $jap, WalletService $wallet)
     {
+        $serviceManager = app(\App\Services\ServiceManager::class);
+        if (!$serviceManager->isAvailable('boosting')) {
+            $msg = $serviceManager->getMaintenanceMessage('boosting');
+            if ($request->expectsJson() || $request->ajax()) {
+                return response()->json(['success' => false, 'message' => $msg], 403);
+            }
+            return back()->with('error', $msg);
+        }
+
         $request->validate([
             'boost_service_id' => 'required|integer|exists:boost_services,id',
             'link' => 'required|url|max:2048',

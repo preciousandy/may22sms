@@ -47,6 +47,18 @@ class DashboardController extends Controller
         $todayFundingUsd = (float) FundingTransaction::where('status', 'approved')->whereDate('approved_at', $today)->sum('amount_usd');
         $pendingFundingCount = FundingTransaction::whereNull('approved_at')->whereNull('rejected_at')->count();
 
+        // Utilities (Airtime, Data, Electricity, Betting)
+        $todayUtilityCount = \App\Models\UtilityTransaction::where('status', 'completed')->whereDate('created_at', $today)->count();
+        $todayUtilityUsd = (float) \App\Models\UtilityTransaction::where('status', 'completed')->whereDate('created_at', $today)->sum('total_charged_usd');
+        $allTimeUtilityCount = \App\Models\UtilityTransaction::where('status', 'completed')->count();
+        $allTimeUtilityUsd = (float) \App\Models\UtilityTransaction::where('status', 'completed')->sum('total_charged_usd');
+
+        // Services availability stats
+        $servicesTotal = \App\Models\ServiceConfiguration::count();
+        $servicesEnabled = \App\Models\ServiceConfiguration::where('is_enabled', true)->count();
+        $servicesDisabled = max(0, $servicesTotal - $servicesEnabled);
+        $serviceStatuses = app(\App\Services\ServiceManager::class)->getAllStatuses();
+
         $totalRevenueUsd = $todayFundingUsd;
 
         // Admin Net Gain / Profit Breakdown
@@ -207,10 +219,25 @@ class DashboardController extends Controller
             ])
             ->selectRaw('boost_services.name as meta');
 
+        $utilities = DB::table('utility_transactions')
+            ->join('users', 'users.id', '=', 'utility_transactions.user_id')
+            ->selectRaw("'utility' as type")
+            ->addSelect([
+                'utility_transactions.id as id',
+                'utility_transactions.user_id as user_id',
+                'users.name as user_name',
+                'users.email as user_email',
+                'utility_transactions.total_charged_usd as amount_usd',
+                'utility_transactions.status as status',
+                'utility_transactions.created_at as created_at',
+            ])
+            ->selectRaw('utility_transactions.product_name as meta');
+
         $activityUnion = $funding
             ->unionAll($logs)
             ->unionAll($sms)
-            ->unionAll($boost);
+            ->unionAll($boost)
+            ->unionAll($utilities);
 
         $latestActivity = DB::query()
             ->fromSub($activityUnion, 'a')
@@ -266,6 +293,14 @@ class DashboardController extends Controller
             'series',
             'latestUsers',
             'latestActivity',
+            'todayUtilityCount',
+            'todayUtilityUsd',
+            'allTimeUtilityCount',
+            'allTimeUtilityUsd',
+            'servicesTotal',
+            'servicesEnabled',
+            'servicesDisabled',
+            'serviceStatuses'
         ));
     }
 }

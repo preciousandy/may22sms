@@ -103,24 +103,21 @@ class UserDashboardTest extends TestCase
         $resCrypto->assertSee('Launching Soon');
         $resCrypto->assertSee('Notify Me');
 
-        // 2. Airtime & Data
+        // 2. Airtime & Data (Live BigiSub Utility)
         $resAirtime = $this->actingAs($user)->get('/services/airtime-data');
         $resAirtime->assertStatus(200);
-        $resAirtime->assertSee('VTU Airtime & High-Speed Data');
-        $resAirtime->assertSee('Launching Soon');
+        $resAirtime->assertSee('Airtime');
+        $resAirtime->assertSee('Data Bundles');
 
-        // 3. Electricity
+        // 3. Electricity (Live BigiSub Utility)
         $resPower = $this->actingAs($user)->get('/services/electricity');
         $resPower->assertStatus(200);
-        $resPower->assertSee('Electricity Bills & Token Recharge');
-        $resPower->assertSee('Launching Soon');
+        $resPower->assertSee('Electricity');
 
-        // 4. Betting
+        // 4. Betting (Live BigiSub Utility)
         $resBetting = $this->actingAs($user)->get('/services/betting');
         $resBetting->assertStatus(200);
-        $resBetting->assertSee('Betting Account Funding & Top-Up');
-        $resBetting->assertSee('Launching Soon');
-        $resBetting->assertSee('SportyBet, Bet9ja');
+        $resBetting->assertSee('Betting');
     }
 
     public function test_authenticated_user_can_view_tutorials_and_service_guides(): void

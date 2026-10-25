@@ -27,18 +27,68 @@ class SupportTicketController extends Controller
         return [$path, $originalName, $type];
     }
 
-    public function index()
+    public function index(Request $request)
     {
-        $tickets = SupportTicket::where('user_id', auth()->id())
+        $userId = auth()->id();
+        $statusFilter = $request->query('status', 'all');
+        $searchQuery = trim((string) $request->query('q', ''));
+
+        $query = SupportTicket::where('user_id', $userId)
             ->withCount('messages')
-            ->latest()
-            ->paginate(15)
-            ->withQueryString();
+            ->with(['messages' => function ($q) {
+                $q->latest()->take(1);
+            }]);
 
-        $openCount = SupportTicket::where('user_id', auth()->id())->where('status', 'open')->count();
-        $closedCount = SupportTicket::where('user_id', auth()->id())->where('status', 'closed')->count();
+        if ($statusFilter === 'open') {
+            $query->where('status', 'open');
+        } elseif ($statusFilter === 'closed') {
+            $query->where('status', 'closed');
+        }
 
-        return view('user.tickets.index', compact('tickets', 'openCount', 'closedCount'));
+        if ($searchQuery !== '') {
+            $query->where(function ($q) use ($searchQuery) {
+                $q->where('subject', 'like', "%{$searchQuery}%")
+                  ->orWhere('category', 'like', "%{$searchQuery}%")
+                  ->orWhere('id', 'like', "%{$searchQuery}%");
+            });
+        }
+
+        $tickets = $query->orderByDesc('last_message_at')->orderByDesc('id')->paginate(15)->withQueryString();
+
+        $openCount = SupportTicket::where('user_id', $userId)->where('status', 'open')->count();
+        $closedCount = SupportTicket::where('user_id', $userId)->where('status', 'closed')->count();
+        $totalCount = SupportTicket::where('user_id', $userId)->count();
+
+        // Active ticket if specified in query
+        $activeTicketId = $request->query('ticket');
+        $activeTicket = null;
+        if ($activeTicketId) {
+            $activeTicket = SupportTicket::where('user_id', $userId)
+                ->with(['messages' => function ($q) {
+                    $q->oldest();
+                }])
+                ->find($activeTicketId);
+        }
+
+        // Recent user orders for 1-click issue linking
+        $recentSms = \App\Models\SmsOrder::where('user_id', $userId)->latest()->take(3)->get(['id', 'order_id', 'product', 'phone_number', 'price', 'status', 'created_at']);
+        $recentFunding = \App\Models\FundingTransaction::where('user_id', $userId)->latest()->take(3)->get(['id', 'reference', 'amount_usd', 'payment_method', 'status', 'created_at']);
+        $recentLogs = \App\Models\LogOrder::where('user_id', $userId)->latest()->take(3)->get(['id', 'total_amount', 'total_items', 'status', 'created_at']);
+        $recentUtilities = \App\Models\UtilityTransaction::where('user_id', $userId)->latest()->take(3)->get(['id', 'reference', 'service_type', 'product_name', 'customer_target', 'total_charged_usd', 'status', 'created_at']);
+
+        return view('user.tickets.index', compact(
+            'tickets',
+            'openCount',
+            'closedCount',
+            'totalCount',
+            'statusFilter',
+            'searchQuery',
+            'activeTicket',
+            'recentSms',
+            'recentFunding',
+            'recentLogs',
+            'recentUtilities'
+        ));
     }
 
     public function store(Request $request)
@@ -75,10 +125,10 @@ class SupportTicketController extends Controller
         auth()->user()->notify(new SimpleDatabaseNotification(
             'Support ticket created',
             'Your support ticket #' . $ticket->id . ' was created successfully.',
-            '/tickets/' . $ticket->id
+            '/tickets?ticket=' . $ticket->id
         ));
 
-        return redirect('/tickets/' . $ticket->id)->with('success', 'Ticket created successfully.');
+        return redirect('/tickets?ticket=' . $ticket->id)->with('success', 'Ticket #' . $ticket->id . ' created successfully.');
     }
 
     public function show($id)
@@ -89,14 +139,21 @@ class SupportTicketController extends Controller
             }])
             ->findOrFail($id);
 
-        return view('user.tickets.show', compact('ticket'));
+        if (request()->wantsJson() || request()->ajax()) {
+            return response()->json($ticket);
+        }
+
+        return redirect('/tickets?ticket=' . $ticket->id);
     }
 
     public function reply(Request $request, $id)
     {
         $ticket = SupportTicket::where('user_id', auth()->id())->findOrFail($id);
         if ($ticket->status !== 'open') {
-            return back()->with('error', 'This ticket is closed.');
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'This ticket is closed. Please reopen it to reply.'], 422);
+            }
+            return back()->with('error', 'This ticket is closed. Please reopen it to reply.');
         }
 
         $validated = $request->validate([
@@ -105,12 +162,15 @@ class SupportTicketController extends Controller
         ]);
 
         if (empty(trim((string) ($request->message ?? ''))) && ! $request->hasFile('attachment')) {
+            if ($request->wantsJson() || $request->ajax()) {
+                return response()->json(['status' => 'error', 'message' => 'Please enter a message or attach a file.'], 422);
+            }
             return back()->with('error', 'Please enter a message or attach a file.');
         }
 
         [$attachmentPath, $attachmentName, $attachmentType] = $this->processAttachment($request);
 
-        SupportTicketMessage::create([
+        $msg = SupportTicketMessage::create([
             'support_ticket_id' => $ticket->id,
             'user_id' => auth()->id(),
             'is_admin' => false,
@@ -123,6 +183,25 @@ class SupportTicketController extends Controller
         $ticket->last_message_at = now();
         $ticket->save();
 
+        if ($request->wantsJson() || $request->ajax()) {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Reply sent successfully.',
+                'data' => [
+                    'id' => $msg->id,
+                    'is_admin' => false,
+                    'sender_name' => 'You',
+                    'message' => $msg->message,
+                    'attachment_url' => $msg->attachment_url,
+                    'attachment_name' => $msg->attachment_name,
+                    'attachment_type' => $msg->attachment_type,
+                    'is_image' => $msg->isImage(),
+                    'created_at_formatted' => $msg->created_at->format('M d, Y · h:i A'),
+                    'created_at_diff' => $msg->created_at->diffForHumans(),
+                ],
+            ]);
+        }
+
         return back()->with('success', 'Reply sent successfully.');
     }
 
@@ -132,6 +211,42 @@ class SupportTicketController extends Controller
         $ticket->status = 'closed';
         $ticket->save();
 
-        return back()->with('success', 'Ticket closed successfully.');
+        return back()->with('success', 'Ticket #' . $ticket->id . ' closed successfully.');
+    }
+
+    public function reopen($id)
+    {
+        $ticket = SupportTicket::where('user_id', auth()->id())->findOrFail($id);
+        $ticket->status = 'open';
+        $ticket->last_message_at = now();
+        $ticket->save();
+
+        return back()->with('success', 'Ticket #' . $ticket->id . ' has been reopened.');
+    }
+
+    public function messagesJson($id)
+    {
+        $ticket = SupportTicket::where('user_id', auth()->id())->findOrFail($id);
+        $messages = $ticket->messages()->oldest()->get()->map(function ($m) {
+            return [
+                'id' => $m->id,
+                'is_admin' => (bool) $m->is_admin,
+                'sender_name' => $m->is_admin ? 'May22SMS Support' : 'You',
+                'message' => $m->message,
+                'attachment_url' => $m->attachment_url,
+                'attachment_name' => $m->attachment_name,
+                'attachment_type' => $m->attachment_type,
+                'is_image' => $m->isImage(),
+                'created_at_formatted' => $m->created_at->format('M d, Y · h:i A'),
+                'created_at_diff' => $m->created_at->diffForHumans(),
+            ];
+        });
+
+        return response()->json([
+            'status' => 'success',
+            'ticket_id' => $ticket->id,
+            'ticket_status' => $ticket->status,
+            'messages' => $messages,
+        ]);
     }
 }

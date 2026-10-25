@@ -101,5 +101,14 @@ return [
         'provider' => env('MONIETUDE_PROVIDER', 'palmpay'),
     ],
 
+    'bigisub' => [
+        'api_token' => env('BIGISUB_API_KEY', env('BIGISUB_API_TOKEN')),
+        'pin' => env('BIGISUB_PIN'),
+        'base_url' => env('BIGISUB_BASE_URL', 'https://api.bigisub.ng'),
+        'sandbox' => env('BIGISUB_SANDBOX', false),
+        'webhook_secret' => env('BIGISUB_WEBHOOK_SECRET'),
+        'simulate' => env('BIGISUB_SIMULATE', false),
+    ],
+
 ];
 

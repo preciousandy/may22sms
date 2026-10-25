@@ -258,7 +258,7 @@ x-init="
                     <div class="space-y-1">
                         <a href="/admin/savings" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ ($isActive('admin/savings') && !request()->is('admin/savings/categories*') && !request()->is('admin/savings/reconciliation*')) ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
                             <span class="flex items-center">
-                                <span class="text-base mr-3">💰</span>
+                                <svg class="w-4 h-4 mr-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 Save Small Small
                             </span>
                             <span class="px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase bg-[#facc15] text-gray-950">16.9%</span>
@@ -339,6 +339,11 @@ x-init="
                         <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path></svg>
                         API Settings
                     </a>
+
+                    <a href="/admin/services" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/services') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <svg class="w-4 h-4 mr-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
+                        Service Controls
+                    </a>
                 @endif
 
                 <a href="/admin/mail" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/mail') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
@@ -354,8 +359,13 @@ x-init="
                 @endif
 
                 <a href="/admin/football-matches" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/football-matches') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
-                    <span class="mr-3 text-base">⚽</span>
+                    <svg class="w-4 h-4 mr-3 text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke-width="2"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 016.36 15.36M12 3a9 9 0 00-6.36 15.36M12 3v18M3 12h18"/></svg>
                     Live Football
+                </a>
+
+                <a href="/admin/utilities" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/utilities') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                    <svg class="w-4 h-4 mr-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Utilities &amp; BigiSub
                 </a>
             </nav>
         </div>
@@ -387,8 +397,8 @@ x-init="
                         <span x-show="!isAttended('orders', {{ $navCounts['orders'] }})" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-rose-600 text-white animate-pulse">
                             {{ $navCounts['orders'] }}
                         </span>
-                        <span x-show="isAttended('orders', {{ $navCounts['orders'] }})" style="display: none;" class="ml-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-600 text-white">
-                            ✓
+                        <span x-show="isAttended('orders', {{ $navCounts['orders'] }})" style="display: none;" class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-600 text-white">
+                            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>
                         </span>
                     @endif
                 </a>

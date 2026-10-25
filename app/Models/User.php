@@ -109,4 +109,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(SavingsContribution::class);
     }
+
+    public function utilityTransactions()
+    {
+        return $this->hasMany(UtilityTransaction::class);
+    }
 }

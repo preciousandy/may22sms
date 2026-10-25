@@ -40,7 +40,6 @@ class AdminDashboardControllerTest extends TestCase
         // Create completed Log order
         LogOrder::create([
             'user_id' => $user->id,
-            'order_reference' => 'LOG-TEST-1',
             'total_amount' => 5.00,
             'total_items' => 1,
             'status' => 'completed',
@@ -66,6 +65,12 @@ class AdminDashboardControllerTest extends TestCase
         $response->assertViewHas('allTimeFundingUsd');
         $response->assertViewHas('todaySpentUsd');
         $response->assertViewHas('todayTotalGain');
+        $response->assertViewHas('servicesTotal');
+        $response->assertViewHas('servicesEnabled');
+        $response->assertViewHas('servicesDisabled');
+        $response->assertViewHas('serviceStatuses');
+        $response->assertViewHas('todayUtilityCount');
+        $response->assertViewHas('allTimeUtilityCount');
 
         // Total Spent should include SMS ($2.00) + Log ($5.00) = $7.00
         $spent = $response->viewData('allTimeSpentUsd');
@@ -74,6 +79,15 @@ class AdminDashboardControllerTest extends TestCase
         // Funding should be $10.00
         $funding = $response->viewData('allTimeFundingUsd');
         $this->assertEquals(10.00, $funding);
+
+        // Service controls metrics check
+        $this->assertGreaterThanOrEqual(0, $response->viewData('servicesTotal'));
+        $this->assertGreaterThanOrEqual(0, $response->viewData('servicesEnabled'));
+
+        // View content assertions
+        $response->assertSee('May22SMS Executive Console');
+        $response->assertSee('All-Time Net Profit');
+        $response->assertSee('Services:');
     }
 
     public function test_admin_can_run_storage_link_maintenance()

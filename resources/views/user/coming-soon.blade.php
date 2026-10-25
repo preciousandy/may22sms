@@ -38,6 +38,16 @@
         </div>
     </div>
 
+    @if(isset($isAvailable) && !$isAvailable)
+        <div class="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-900 flex items-start gap-3">
+            <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+            <div>
+                <div class="font-black text-xs uppercase tracking-wider text-amber-950">Service Temporarily Unavailable</div>
+                <div class="text-xs text-amber-900 mt-0.5">{{ $maintenanceMessage ?? 'This service is temporarily unavailable. Please try again later.' }}</div>
+            </div>
+        </div>
+    @endif
+
     <!-- OPay Style Coming Soon Hero Banner -->
     <div class="relative overflow-hidden rounded-3xl p-6 sm:p-10 text-white shadow-xl border border-slate-800"
          style="background: linear-gradient(135deg, #090d16 0%, #0f172a 60%, #0d9488 100%) !important; background-color: #0f172a !important; color: #ffffff !important;">

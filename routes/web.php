@@ -212,6 +212,8 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::get('/tickets/{id}', [SupportTicketController::class, 'show']);
     Route::post('/tickets/{id}/reply', [SupportTicketController::class, 'reply']);
     Route::post('/tickets/{id}/close', [SupportTicketController::class, 'close']);
+    Route::post('/tickets/{id}/reopen', [SupportTicketController::class, 'reopen']);
+    Route::get('/tickets/{id}/messages', [SupportTicketController::class, 'messagesJson']);
 
     Route::post('/favorites/toggle', [FavoriteController::class, 'toggle']);
     Route::get('/favorites', [FavoriteController::class, 'index']);
@@ -237,69 +239,51 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::post('/savings/{id}/contribute', [\App\Http\Controllers\User\SavingsController::class, 'contribute'])->name('savings.contribute');
     Route::post('/savings/{id}/break', [\App\Http\Controllers\User\SavingsController::class, 'breakPlan'])->name('savings.break');
 
-    // Upcoming Fintech & Utility Services (Coming Soon)
-    Route::get('/services/{service}', function (string $service) {
-        $allowed = [
-            'crypto-to-naira' => [
-                'title' => 'Receive Crypto & Convert to Naira',
-                'category' => 'Fintech & Web3',
-                'icon' => '🪙',
-                'badge' => 'NEW',
-                'desc' => 'Generate dedicated deposit addresses for USDT, BTC, and ETH. Instantly auto-swap to Nigerian Naira (NGN) deposited directly into your bank account or May22SMS wallet balance with zero delay.',
-                'features' => [
-                    'Zero Gas Fee Settlement on TRC20 & BEP20',
-                    'Competitive Real-Time P2P Rates',
-                    'Direct Bank Transfer to all Nigerian Commercial Banks & Fintechs',
-                    'Automated Multi-Coin Support (USDT, BTC, ETH, SOL)',
-                ],
-            ],
-            'airtime-data' => [
-                'title' => 'VTU Airtime & High-Speed Data',
-                'category' => 'Telecom Utilities',
-                'icon' => '📶',
-                'badge' => 'NEW',
-                'desc' => 'Instant VTU airtime recharge and discounted data bundles across MTN, Airtel, Glo, and 9mobile at up to 5% cashback discount.',
-                'features' => [
-                    'Instant Automated API Top-up in < 5 seconds',
-                    'MTN, Airtel, Glo & 9mobile Corporate Gifting & SME Data',
-                    'Cashback discounts on all airtime and bundle orders',
-                    'Auto-renew options for daily and monthly bundles',
-                ],
-            ],
-            'electricity' => [
-                'title' => 'Electricity Bills & Token Recharge',
-                'category' => 'Power & Utility Bills',
-                'icon' => '⚡',
-                'badge' => 'NEW',
-                'desc' => 'Instant prepaid electricity token generation and postpaid bill payment for all major DisCos across Nigeria.',
-                'features' => [
-                    'Instant Meter Token SMS & On-Screen Receipt',
-                    'Supports IKEDC, EKEDC, AEDC, IBEDC, PHED, EEDC, KEDCO, JED',
-                    'Zero Conveniency Fee with instant meter verification',
-                    'Saved meters for one-tap recharge anytime',
-                ],
-            ],
-            'betting' => [
-                'title' => 'Betting Account Funding & Top-Up',
-                'category' => 'Gaming & Wallets',
-                'icon' => '🎯',
-                'badge' => 'NEW',
-                'desc' => 'Fund your betting accounts instantly with zero processing fees. Top up SportyBet, Bet9ja, 1xBet, BetKing, MSport, Bangbet and more directly from your May22SMS wallet balance.',
-                'features' => [
-                    'Supports SportyBet, Bet9ja, 1xBet, BetKing, MSport, Bangbet & Merrybet',
-                    'Instant Customer ID & Name verification before payment',
-                    'Zero hidden transaction fees on all betting wallet deposits',
-                    'Save your Betting User ID for fast 1-tap re-funding anytime',
-                ],
+    // Digital Utilities & Bills (BigiSub Integration)
+    Route::get('/services', [\App\Http\Controllers\User\UtilityController::class, 'index'])->name('utilities.index');
+    Route::get('/user/utilities', [\App\Http\Controllers\User\UtilityController::class, 'index'])->name('user.utilities.index');
+    Route::get('/services/airtime', [\App\Http\Controllers\User\UtilityController::class, 'airtime'])->name('utilities.airtime');
+    Route::get('/services/data', [\App\Http\Controllers\User\UtilityController::class, 'data'])->name('utilities.data');
+    Route::get('/services/electricity', [\App\Http\Controllers\User\UtilityController::class, 'electricity'])->name('utilities.electricity');
+    Route::get('/services/betting', [\App\Http\Controllers\User\UtilityController::class, 'betting'])->name('utilities.betting');
+    Route::get('/services/airtime-data', [\App\Http\Controllers\User\UtilityController::class, 'index'])->name('utilities.airtime-data');
+    Route::get('/services/history', [\App\Http\Controllers\User\UtilityController::class, 'history'])->name('utilities.history');
+    Route::get('/user/utilities/history', [\App\Http\Controllers\User\UtilityController::class, 'history'])->name('user.utilities.history');
+    Route::get('/services/receipt/{reference}', [\App\Http\Controllers\User\UtilityController::class, 'receipt'])->name('utilities.receipt');
+    Route::get('/user/utilities/receipt/{reference}', [\App\Http\Controllers\User\UtilityController::class, 'receipt'])->name('user.utilities.receipt');
+
+    Route::get('/api/utilities/plans', [\App\Http\Controllers\User\UtilityController::class, 'getPlans'])->name('utilities.api.plans');
+    Route::post('/api/utilities/verify-meter', [\App\Http\Controllers\User\UtilityController::class, 'verifyMeter'])->name('utilities.api.verify-meter');
+    Route::post('/api/utilities/verify-betting', [\App\Http\Controllers\User\UtilityController::class, 'verifyBetting'])->name('utilities.api.verify-betting');
+
+    Route::post('/services/airtime/purchase', [\App\Http\Controllers\User\UtilityController::class, 'purchaseAirtime'])->name('utilities.purchase.airtime');
+    Route::post('/services/data/purchase', [\App\Http\Controllers\User\UtilityController::class, 'purchaseData'])->name('utilities.purchase.data');
+    Route::post('/services/electricity/pay', [\App\Http\Controllers\User\UtilityController::class, 'payElectricity'])->name('utilities.pay.electricity');
+    Route::post('/services/betting/fund', [\App\Http\Controllers\User\UtilityController::class, 'fundBetting'])->name('utilities.fund.betting');
+
+    // Remaining Coming Soon Service (Crypto to Naira)
+    Route::get('/services/crypto-to-naira', function () {
+        $serviceManager = app(\App\Services\ServiceManager::class);
+        $isAvailable = $serviceManager->isAvailable('crypto_to_naira');
+        $maintenanceMessage = $serviceManager->getMaintenanceMessage('crypto_to_naira');
+
+        $serviceData = [
+            'title' => 'Receive Crypto & Convert to Naira',
+            'category' => 'Fintech & Web3',
+            'icon' => '🪙',
+            'badge' => $isAvailable ? 'NEW' : 'UNAVAILABLE',
+            'is_available' => $isAvailable,
+            'maintenance_message' => $maintenanceMessage,
+            'desc' => 'Generate dedicated deposit addresses for USDT, BTC, and ETH. Instantly auto-swap to Nigerian Naira (NGN) deposited directly into your bank account or May22SMS wallet balance with zero delay.',
+            'features' => [
+                'Zero Gas Fee Settlement on TRC20 & BEP20',
+                'Competitive Real-Time P2P Rates',
+                'Direct Bank Transfer to all Nigerian Commercial Banks & Fintechs',
+                'Automated Multi-Coin Support (USDT, BTC, ETH, SOL)',
             ],
         ];
-
-        if (! array_key_exists($service, $allowed)) {
-            abort(404);
-        }
-
-        $serviceData = $allowed[$service];
-        return view('user.coming-soon', compact('serviceData', 'service'));
+        $service = 'crypto-to-naira';
+        return view('user.coming-soon', compact('serviceData', 'service', 'isAvailable', 'maintenanceMessage'));
     })->name('services.coming-soon');
 });
 
@@ -377,6 +361,10 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     });
     Route::post('/settings/sync-countries', [SettingsController::class, 'syncCountries']);
 
+    // Admin Service Availability Controls
+    Route::get('/services', [\App\Http\Controllers\Admin\ServiceManagementController::class, 'index'])->name('admin.services.index');
+    Route::post('/services/{key}/toggle', [\App\Http\Controllers\Admin\ServiceManagementController::class, 'toggle'])->name('admin.services.toggle');
+
     Route::get('/charges', [\App\Http\Controllers\Admin\ChargesController::class, 'index']);
     Route::post('/charges', [\App\Http\Controllers\Admin\ChargesController::class, 'update']);
 
@@ -425,6 +413,13 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::post('/sporty-bet-codes', [\App\Http\Controllers\Admin\SportyBetCodeController::class, 'store']);
     Route::post('/sporty-bet-codes/{code}/toggle', [\App\Http\Controllers\Admin\SportyBetCodeController::class, 'toggle']);
     Route::delete('/sporty-bet-codes/{code}', [\App\Http\Controllers\Admin\SportyBetCodeController::class, 'destroy']);
+
+    // Digital Utilities (BigiSub) Admin Management
+    Route::get('/utilities', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'index'])->name('admin.utilities.index');
+    Route::get('/utilities/{id}', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'show'])->name('admin.utilities.show');
+    Route::post('/utilities/settings', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'updateSettings'])->name('admin.utilities.settings');
+    Route::post('/utilities/{id}/reconcile', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'reconcile'])->name('admin.utilities.reconcile');
+    Route::post('/utilities/{id}/refund', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'refund'])->name('admin.utilities.refund');
 });
 
 Route::get('/test-mail', function () {
