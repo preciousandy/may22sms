@@ -17,5 +17,7 @@ class VerifyCsrfToken extends Middleware
         'api/nowpayments/ipn',
         'api/pocketfi/webhook',
         'api/monietude/webhook',
+        'api/webhooks/quidax',
+        'webhooks/quidax',
     ];
 }

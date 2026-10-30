@@ -167,10 +167,19 @@ class SavingsController extends Controller
 
         try {
             $result = $this->savingsService->breakPlan($plan, auth()->user());
+
+            if (isset($result['statement']) && ($result['statement']['type'] ?? '') === 'maturity_payout') {
+                $totalPayout = $result['statement']['total_payout'] ?? 0;
+                return redirect()->route('savings.show', $plan->id)
+                    ->with('success', "Plan has reached maturity! Full principal and net interest payout of {$plan->currency} " . number_format($totalPayout, 2) . " has been returned to your main wallet without early-break fee.");
+            }
+
             $netPayout = $result['summary']['net_payout'] ?? 0;
+            $fee = $result['summary']['early_break_fee'] ?? 0;
+            $feePercent = $result['summary']['early_break_fee_percent'] ?? 2.5;
 
             return redirect()->route('savings.show', $plan->id)
-                ->with('success', "Savings plan broken. Net payout of {$plan->currency} " . number_format($netPayout, 2) . " has been returned to your main wallet.");
+                ->with('success', "Savings plan broken early. {$feePercent}% fee of {$plan->currency} " . number_format($fee, 2) . " deducted. Net payout of {$plan->currency} " . number_format($netPayout, 2) . " has been returned to your main wallet.");
         } catch (Throwable $e) {
             return redirect()->route('savings.show', $plan->id)->with('error', $e->getMessage());
         }

@@ -5,6 +5,10 @@
 
 <div class="space-y-6" x-data="{
     showNewCategoryModal: false,
+    showAdjustFeeModal: false,
+    adjustingCategory: null,
+    adjustingCategoryName: '',
+    adjustingCategoryFee: 2.50,
     editingCategory: null,
     editData: {}
 }">
@@ -131,6 +135,12 @@
                             <span class="text-gray-500">Maturity Fee:</span>
                             <span class="font-bold text-gray-800">{{ $hasInterest ? $category->maturity_fee_percent . '% of profit' : '₦0.00 (Zero Fee)' }}</span>
                         </div>
+                        <div class="flex justify-between items-center pt-1 border-t border-gray-200/60">
+                            <span class="text-gray-600 font-bold">Early Break Fee:</span>
+                            <span class="font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded-lg border border-rose-200">
+                                {{ number_format($category->early_withdrawal_fee_percent, 2) }}% of principal
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -147,6 +157,12 @@
                             </button>
                         </form>
                     </div>
+
+                    <button type="button" 
+                            @click="adjustingCategory = {{ $category->id }}; adjustingCategoryName = '{{ addslashes($category->name) }}'; adjustingCategoryFee = {{ $category->early_withdrawal_fee_percent }}; showAdjustFeeModal = true;"
+                            class="w-full py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs transition cursor-pointer text-center border border-rose-200 flex items-center justify-center gap-1.5">
+                        <span>⚡ Adjust Break Fee ({{ number_format($category->early_withdrawal_fee_percent, 1) }}%)</span>
+                    </button>
 
                     <button type="button" 
                             @click="editingCategory = {{ $category->id }}; editData = @js($category);"
@@ -339,7 +355,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div class="space-y-1">
                         <label class="font-bold text-gray-700">Early Break Fee (% of principal)</label>
-                        <input type="number" step="0.01" name="early_withdrawal_fee_percent" value="0.00" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs" required>
+                        <input type="number" step="0.01" min="0" max="100" name="early_withdrawal_fee_percent" value="2.50" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold text-rose-600" required>
                     </div>
                     <div class="space-y-1">
                         <label class="font-bold text-gray-700">Forfeited Interest (%)</label>
@@ -364,6 +380,51 @@
                     </button>
                     <button type="submit" class="w-1/2 py-2.5 rounded-xl bg-[#0d9488] hover:bg-teal-700 text-white font-bold shadow-md">
                         Create Category
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Quick Adjust Early Break Fee Modal -->
+    <div x-show="showAdjustFeeModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" style="display: none;">
+        <div @click.away="showAdjustFeeModal = false" class="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-4">
+            <div class="flex items-center justify-between border-b border-gray-100 pb-3">
+                <div class="flex items-center gap-2">
+                    <span class="text-xl">⚡</span>
+                    <h3 class="text-base font-black text-gray-900">Adjust Early Break Fee</h3>
+                </div>
+                <button type="button" @click="showAdjustFeeModal = false" class="text-gray-400 hover:text-gray-600 text-lg">&times;</button>
+            </div>
+
+            <p class="text-xs text-gray-500 leading-relaxed">
+                Configure the early savings break fee percentage for <strong class="text-gray-900" x-text="adjustingCategoryName"></strong>. Users breaking plans early under this option will be charged this fee on their eligible savings principal.
+            </p>
+
+            <form :action="'/admin/savings/categories/' + adjustingCategory + '/break-fee'" method="POST" class="space-y-4 text-xs">
+                @csrf
+                <div class="space-y-1.5">
+                    <label class="font-bold text-gray-700">Early Break Fee (% of principal)</label>
+                    <div class="relative">
+                        <input type="number" 
+                               step="0.01" 
+                               min="0" 
+                               max="100" 
+                               name="early_withdrawal_fee_percent" 
+                               x-model="adjustingCategoryFee" 
+                               class="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-black text-rose-600 focus:outline-none focus:ring-2 focus:ring-rose-500" 
+                               required>
+                        <span class="absolute right-4 top-3.5 text-gray-400 font-bold">%</span>
+                    </div>
+                    <p class="text-[11px] text-gray-400">Standard OPay model default is 2.50%. Set to 0.00% to disable the break fee.</p>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <button type="button" @click="showAdjustFeeModal = false" class="w-1/2 py-2.5 rounded-xl bg-gray-100 text-gray-700 font-bold hover:bg-gray-200 cursor-pointer">
+                        Cancel
+                    </button>
+                    <button type="submit" class="w-1/2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold shadow-md shadow-rose-600/20 cursor-pointer">
+                        Save Break Fee
                     </button>
                 </div>
             </form>

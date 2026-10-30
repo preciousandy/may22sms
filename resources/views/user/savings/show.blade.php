@@ -18,8 +18,10 @@
     activeTab: 'contributions',
     showTopupModal: false,
     showBreakModal: false,
+    showMaturityModal: false,
     topupAmount: '',
     confirmBreakCheckbox: false,
+    confirmMaturityCheckbox: false,
     formatMoney(val) {
         return Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
@@ -108,11 +110,17 @@
                         <span>+ Add Money</span>
                     </button>
 
-                    @if($plan->allow_early_withdrawal)
+                    @if($plan->isMatured())
+                        <button type="button" 
+                                @click="showMaturityModal = true" 
+                                class="px-5 py-3 rounded-2xl bg-teal-400 hover:bg-teal-300 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg transition active:scale-95 cursor-pointer flex items-center justify-center gap-1.5">
+                            <span>🏆 Withdraw Matured Savings</span>
+                        </button>
+                    @elseif($plan->allow_early_withdrawal)
                         <button type="button" 
                                 @click="showBreakModal = true" 
-                                class="px-5 py-2.5 rounded-2xl bg-white/15 hover:bg-white/25 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer border border-white/20 flex items-center justify-center gap-1.5">
-                            <span>⚡ Break Savings</span>
+                                class="px-5 py-2.5 rounded-2xl bg-rose-500/80 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider transition active:scale-95 cursor-pointer border border-rose-400/40 flex items-center justify-center gap-1.5 shadow-md">
+                            <span>⚡ Break Savings / Withdraw Early</span>
                         </button>
                     @endif
                 </div>
@@ -127,7 +135,7 @@
             <div class="flex items-center justify-between border-b border-white/10 pb-3">
                 <div class="flex items-center gap-2">
                     <span class="text-xl">📜</span>
-                    <h3 class="text-sm sm:text-base font-black text-white">Official Payout Statement</h3>
+                    <h3 class="text-sm sm:text-base font-black text-white">Official Payout Statement ({{ $plan->status === 'broken' ? 'Early Break Withdrawal' : 'Maturity Settlement' }})</h3>
                 </div>
                 <span class="text-xs text-slate-400">Processed: {{ \Carbon\Carbon::parse($statement['processed_at'] ?? now())->format('M d, Y h:i A') }}</span>
             </div>
@@ -142,12 +150,19 @@
                     <div class="text-base font-black text-teal-400 mt-1">+{{ $pSymbol }}{{ number_format($statement['gross_interest_earned'] ?? ($statement['accrued_interest'] ?? 0), 2) }}</div>
                 </div>
                 <div class="p-3 rounded-2xl bg-white/5 border border-white/10">
-                    <div class="text-[10px] text-slate-400">Fees / Forfeited</div>
-                    <div class="text-base font-black text-rose-400 mt-1">-{{ $pSymbol }}{{ number_format($statement['forfeited_interest'] ?? ($statement['maturity_fee'] ?? 0), 2) }}</div>
+                    <div class="text-[10px] text-slate-400">{{ $plan->status === 'broken' ? 'Deductions (Fee + Forfeited)' : 'Maturity Fee' }}</div>
+                    <div class="text-base font-black text-rose-400 mt-1">
+                        @if($plan->status === 'broken')
+                            -{{ $pSymbol }}{{ number_format(($statement['early_break_fee'] ?? 0) + ($statement['forfeited_interest'] ?? 0), 2) }}
+                            <span class="text-[10px] block text-slate-400 font-normal">Fee ({{ $statement['early_break_fee_percent'] ?? 2.5 }}%): {{ $pSymbol }}{{ number_format($statement['early_break_fee'] ?? 0, 2) }}</span>
+                        @else
+                            -{{ $pSymbol }}{{ number_format($statement['maturity_fee'] ?? 0, 2) }}
+                        @endif
+                    </div>
                 </div>
                 <div class="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30">
                     <div class="text-[10px] text-emerald-300 font-bold">Net Credited to Wallet</div>
-                    <div class="text-base font-black text-emerald-400 mt-1">{{ $pSymbol }}{{ number_format($statement['total_payout'] ?? ($statement['net_payout'] ?? 0), 2) }}</div>
+                    <div class="text-base font-black text-emerald-400 mt-1">{{ $pSymbol }}{{ number_format($statement['net_payout'] ?? ($statement['total_payout'] ?? 0), 2) }}</div>
                 </div>
             </div>
         </div>
@@ -393,40 +408,48 @@
          style="display: none;">
         <div @click.away="showBreakModal = false" class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-                <div class="flex items-center gap-2 text-amber-600">
+                <div class="flex items-center gap-2 text-rose-600">
                     <span class="text-xl">⚠️</span>
                     <h3 class="text-base font-black text-slate-900">Break Savings Early?</h3>
                 </div>
                 <button type="button" @click="showBreakModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
             </div>
 
-            <p class="text-xs text-slate-600 leading-relaxed">
-                You are requesting an early withdrawal before the official maturity date (<strong>{{ \Carbon\Carbon::parse($plan->maturity_date)->format('M d, Y') }}</strong>). Please review the penalty and net return breakdown:
-            </p>
+            <!-- Warning Notice Box -->
+            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-2 leading-relaxed">
+                <p class="font-bold text-amber-950">
+                    Breaking this savings plan early will attract a {{ number_format($earlyBreakSummary['early_break_fee_percent'], 1) }}% fee on your eligible savings principal. You will also lose all interest earned on this plan. You will receive {{ $pSymbol }}{{ number_format($earlyBreakSummary['net_payout'], 2) }} from a principal of {{ $pSymbol }}{{ number_format($earlyBreakSummary['principal'], 2) }}. Do you want to continue?
+                </p>
+                <p class="text-[11px] text-amber-800">
+                    ⚠️ <strong>Irreversible Action:</strong> Once broken, this savings plan contract will be permanently closed and will stop accruing further interest.
+                </p>
+            </div>
 
-            <!-- Penalty Disclosure Statement -->
-            <div class="p-4 rounded-2xl bg-amber-50 border border-amber-200/80 space-y-2 text-xs">
+            <!-- Complete Financial Breakdown -->
+            <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2.5 text-xs">
                 <div class="flex justify-between font-bold text-slate-700">
-                    <span>Locked Principal:</span>
-                    <span>{{ $pSymbol }}{{ number_format($earlyBreakSummary['principal'], 2) }}</span>
+                    <span class="text-slate-500">Savings Plan Name:</span>
+                    <span class="text-slate-900 font-black">{{ $plan->name }}</span>
                 </div>
-                <div class="flex justify-between font-bold text-slate-500">
-                    <span>Accrued Interest to Date:</span>
-                    <span>+{{ $pSymbol }}{{ number_format($earlyBreakSummary['accrued_interest'], 2) }}</span>
+                <div class="flex justify-between font-bold text-slate-700">
+                    <span class="text-slate-500">Current Principal:</span>
+                    <span class="text-slate-900 font-mono">{{ $pSymbol }}{{ number_format($earlyBreakSummary['principal'], 2) }}</span>
+                </div>
+                <div class="flex justify-between font-bold text-slate-700">
+                    <span class="text-slate-500">Interest Earned to Date:</span>
+                    <span class="text-emerald-700 font-mono">+{{ $pSymbol }}{{ number_format($earlyBreakSummary['accrued_interest'], 2) }}</span>
                 </div>
                 <div class="flex justify-between font-bold text-rose-600">
-                    <span>Forfeited Interest ({{ $earlyBreakSummary['penalty_rate'] }}%):</span>
-                    <span>-{{ $pSymbol }}{{ number_format($earlyBreakSummary['forfeited_interest'], 2) }}</span>
+                    <span>Early-Break Fee ({{ number_format($earlyBreakSummary['early_break_fee_percent'], 1) }}%):</span>
+                    <span class="font-mono">-{{ $pSymbol }}{{ number_format($earlyBreakSummary['early_break_fee'], 2) }}</span>
                 </div>
-                @if($earlyBreakSummary['early_break_fee'] > 0)
-                    <div class="flex justify-between font-bold text-rose-600">
-                        <span>Early Break Fee:</span>
-                        <span>-{{ $pSymbol }}{{ number_format($earlyBreakSummary['early_break_fee'], 2) }}</span>
-                    </div>
-                @endif
-                <div class="flex justify-between font-black text-slate-900 pt-2 border-t border-amber-200 text-sm">
-                    <span>Net Payout to Main Wallet:</span>
-                    <span class="text-emerald-700">{{ $pSymbol }}{{ number_format($earlyBreakSummary['net_payout'], 2) }}</span>
+                <div class="flex justify-between font-bold text-rose-600">
+                    <span>Accrued Interest Forfeited (100%):</span>
+                    <span class="font-mono">-{{ $pSymbol }}{{ number_format($earlyBreakSummary['forfeited_interest'], 2) }}</span>
+                </div>
+                <div class="flex justify-between font-black text-slate-900 pt-2.5 border-t border-slate-200 text-sm">
+                    <span>Final Amount to Main Wallet:</span>
+                    <span class="text-emerald-700 font-mono text-base">{{ $pSymbol }}{{ number_format($earlyBreakSummary['net_payout'], 2) }}</span>
                 </div>
             </div>
 
@@ -440,23 +463,86 @@
                            class="w-4 h-4 mt-0.5 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer" 
                            required>
                     <span class="leading-tight">
-                        I understand that I am forfeiting <strong class="text-rose-600">{{ $pSymbol }}{{ number_format($earlyBreakSummary['forfeited_interest'], 2) }}</strong> in interest by breaking early, and I authorize the immediate return of <strong class="text-emerald-700">{{ $pSymbol }}{{ number_format($earlyBreakSummary['net_payout'], 2) }}</strong> to my main wallet.
+                        I explicitly confirm that I want to break <strong>{{ $plan->name }}</strong> early. I accept the <strong class="text-rose-600">{{ number_format($earlyBreakSummary['early_break_fee_percent'], 1) }}% fee ({{ $pSymbol }}{{ number_format($earlyBreakSummary['early_break_fee'], 2) }})</strong> and forfeit <strong class="text-rose-600">{{ $pSymbol }}{{ number_format($earlyBreakSummary['forfeited_interest'], 2) }}</strong> in interest, and authorize transferring <strong class="text-emerald-700">{{ $pSymbol }}{{ number_format($earlyBreakSummary['net_payout'], 2) }}</strong> to my main wallet.
                     </span>
                 </label>
 
                 <div class="flex items-center gap-2 pt-2">
-                    <button type="button" @click="showBreakModal = false" class="w-1/2 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black">
-                        Keep Saving
+                    <button type="button" @click="showBreakModal = false" class="w-1/2 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black cursor-pointer transition">
+                        Cancel
                     </button>
                     <button type="submit" 
                             :disabled="!confirmBreakCheckbox"
-                            class="w-1/2 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black shadow-md shadow-rose-600/20 cursor-pointer">
-                        Break &amp; Withdraw
+                            class="w-1/2 py-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-black shadow-md shadow-rose-600/20 cursor-pointer transition">
+                        Confirm Break
                     </button>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- Matured Plan Normal Withdrawal Modal -->
+    @if($plan->isMatured())
+        <div x-show="showMaturityModal" 
+             class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+             style="display: none;">
+            <div @click.away="showMaturityModal = false" class="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5">
+                <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                    <div class="flex items-center gap-2 text-teal-600">
+                        <span class="text-xl">🏆</span>
+                        <h3 class="text-base font-black text-slate-900">Withdraw Matured Savings</h3>
+                    </div>
+                    <button type="button" @click="showMaturityModal = false" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+                </div>
+
+                <div class="p-4 rounded-2xl bg-teal-50 border border-teal-200 text-teal-900 text-xs space-y-1.5">
+                    <p class="font-bold text-teal-950">
+                        🎉 Congratulations! Your savings plan has reached its maturity date.
+                    </p>
+                    <p class="text-[11px] text-teal-800">
+                        You are entitled to 100% of your saved principal plus all net accrued interest. <strong>No early break fee applies.</strong>
+                    </p>
+                </div>
+
+                <!-- Breakdown -->
+                <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2 text-xs">
+                    <div class="flex justify-between font-bold text-slate-700">
+                        <span>Plan Name:</span>
+                        <span class="text-slate-900 font-black">{{ $plan->name }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-slate-700">
+                        <span>Principal Amount:</span>
+                        <span class="font-mono">{{ $pSymbol }}{{ number_format($plan->principal_amount, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-emerald-700">
+                        <span>Accrued Interest:</span>
+                        <span class="font-mono">+{{ $pSymbol }}{{ number_format($plan->accrued_interest, 2) }}</span>
+                    </div>
+                    <div class="flex justify-between font-bold text-slate-500">
+                        <span>Maturity Fee ({{ $plan->maturity_fee_percent }}% of interest):</span>
+                        <span class="font-mono">-{{ $pSymbol }}{{ number_format(round($plan->accrued_interest * ($plan->maturity_fee_percent / 100), 2), 2) }}</span>
+                    </div>
+                    <div class="flex justify-between font-black text-slate-900 pt-2 border-t border-slate-200 text-sm">
+                        <span>Total Payout to Main Wallet:</span>
+                        <span class="text-emerald-700 font-mono text-base">{{ $pSymbol }}{{ number_format($plan->projected_maturity_payout, 2) }}</span>
+                    </div>
+                </div>
+
+                <form action="{{ route('savings.break', $plan->id) }}" method="POST" class="space-y-4">
+                    @csrf
+                    <input type="hidden" name="confirm_early_break" value="1">
+                    <div class="flex items-center gap-2 pt-2">
+                        <button type="button" @click="showMaturityModal = false" class="w-1/2 py-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-black cursor-pointer transition">
+                            Cancel
+                        </button>
+                        <button type="submit" class="w-1/2 py-3 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-black shadow-md shadow-teal-600/20 cursor-pointer transition">
+                            Confirm Withdrawal
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
 
 </div>
 

@@ -11,6 +11,11 @@ class SavingsPlan extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $attributes = [
+        'early_break_fee_percent' => 2.50,
+        'early_break_interest_forfeit_percent' => 100.00,
+    ];
+
     protected $fillable = [
         'user_id',
         'category_id',
@@ -101,17 +106,42 @@ class SavingsPlan extends Model
 
     public function isMatured(): bool
     {
-        return $this->status === 'matured' || ($this->isActive() && Carbon::parse($this->maturity_date)->isPast());
+        if ($this->status === 'matured') {
+            return true;
+        }
+
+        if ($this->isActive()) {
+            $maturity = Carbon::parse($this->maturity_date)->startOfDay();
+            return Carbon::today()->greaterThanOrEqualTo($maturity);
+        }
+
+        return false;
     }
 
     public function getDaysRemainingAttribute(): int
     {
-        $today = Carbon::today();
-        $maturity = Carbon::parse($this->maturity_date);
+        $today = Carbon::today()->startOfDay();
+        $maturity = Carbon::parse($this->maturity_date)->startOfDay();
         if ($today->greaterThanOrEqualTo($maturity)) {
             return 0;
         }
         return (int) $today->diffInDays($maturity);
+    }
+
+    public function getEffectiveBreakFeePercentAttribute(): float
+    {
+        if ($this->relationLoaded('category') && $this->category && $this->category->early_withdrawal_fee_percent !== null) {
+            return (float) $this->category->early_withdrawal_fee_percent;
+        }
+
+        if ($this->category_id) {
+            $cat = $this->category ?: SavingsCategory::find($this->category_id);
+            if ($cat && $cat->early_withdrawal_fee_percent !== null) {
+                return (float) $cat->early_withdrawal_fee_percent;
+            }
+        }
+
+        return (float) ($this->early_break_fee_percent ?? 2.50);
     }
 
     public function getDaysElapsedAttribute(): int
@@ -166,23 +196,29 @@ class SavingsPlan extends Model
         $principal = (float) $this->principal_amount;
         $accruedInterest = (float) $this->accrued_interest;
 
-        // Interest forfeited
-        $forfeitPercent = (float) $this->early_break_interest_forfeit_percent;
+        // Interest forfeited: 100% of accrued interest
+        $forfeitPercent = 100.00;
+        if (isset($this->early_break_interest_forfeit_percent) && $this->early_break_interest_forfeit_percent !== null) {
+            $forfeitPercent = (float) $this->early_break_interest_forfeit_percent;
+        }
         $forfeitedInterest = round($accruedInterest * ($forfeitPercent / 100.0), 8);
         $retainedInterest = round(max(0.0, $accruedInterest - $forfeitedInterest), 8);
 
-        // Principal fee (if any, default 0.00%)
-        $feePercent = (float) $this->early_break_fee_percent;
+        // Early-break fee = Eligible principal * feePercent (default 2.50% or admin-adjusted saving option fee)
+        $feePercent = $this->effective_break_fee_percent;
         $earlyBreakFee = round($principal * ($feePercent / 100.0), 2);
 
-        $netPayout = max(0.0, ($principal - $earlyBreakFee) + $retainedInterest);
+        // Net payout = Eligible principal - Early-break fee
+        $netPayout = max(0.0, round(($principal - $earlyBreakFee) + $retainedInterest, 2));
 
         return [
+            'plan_name' => $this->name,
             'principal' => $principal,
             'accrued_interest' => $accruedInterest,
             'forfeited_interest' => $forfeitedInterest,
             'retained_interest' => $retainedInterest,
             'early_break_fee' => $earlyBreakFee,
+            'early_break_fee_percent' => $feePercent,
             'net_payout' => $netPayout,
             'penalty_rate' => $forfeitPercent,
         ];

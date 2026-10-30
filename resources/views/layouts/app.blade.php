@@ -204,7 +204,7 @@
     @endif
 
     <!-- Floating Action Buttons -->
-    <div class="fixed bottom-6 right-6 flex flex-col gap-3 z-50">
+    <div class="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 flex flex-col gap-3 z-40">
         <!-- WhatsApp -->
         <a href="https://chat.whatsapp.com/FCD1Iqs14iPBG4DpiT4Vec?mode=gi_t" target="_blank" rel="noopener noreferrer" class="w-14 h-14 bg-green-500 hover:bg-green-600 rounded-full flex items-center justify-center shadow-lg transition-all duration-300 hover:scale-110">
             <svg class="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">

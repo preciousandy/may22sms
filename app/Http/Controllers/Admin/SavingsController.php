@@ -243,6 +243,35 @@ class SavingsController extends Controller
     }
 
     /**
+     * Directly adjust the early break fee for a savings option/category.
+     */
+    public function updateBreakFee(Request $request, int $id)
+    {
+        $category = SavingsCategory::findOrFail($id);
+
+        $validated = $request->validate([
+            'early_withdrawal_fee_percent' => 'required|numeric|min:0|max:100',
+        ]);
+
+        $oldFee = (float) $category->early_withdrawal_fee_percent;
+        $newFee = (float) $validated['early_withdrawal_fee_percent'];
+
+        $category->early_withdrawal_fee_percent = $newFee;
+        $category->save();
+
+        SavingsAuditLog::record(
+            null,
+            null,
+            auth()->id(),
+            'category_break_fee_updated',
+            ['early_withdrawal_fee_percent' => $oldFee],
+            ['early_withdrawal_fee_percent' => $newFee, 'category' => $category->name]
+        );
+
+        return back()->with('success', "Early breaking fee for '{$category->name}' successfully updated to {$newFee}%.");
+    }
+
+    /**
      * Financial Reconciliation & Audit Trail.
      */
     public function reconciliation()

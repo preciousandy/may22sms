@@ -25,7 +25,7 @@ return new class extends Migration
             $table->unsignedInteger('max_duration_days')->default(365);
             $table->boolean('allow_early_withdrawal')->default(true);
             $table->boolean('allow_partial_withdrawal')->default(false);
-            $table->decimal('early_withdrawal_fee_percent', 5, 2)->default(0.00);
+            $table->decimal('early_withdrawal_fee_percent', 5, 2)->default(2.50);
             $table->decimal('early_withdrawal_interest_forfeited_percent', 5, 2)->default(100.00);
             $table->decimal('maturity_fee_percent', 5, 2)->default(1.50); // 1.5% of earned interest
             $table->boolean('is_enabled')->default(true);
@@ -56,7 +56,7 @@ return new class extends Migration
             $table->unsignedInteger('duration_days');
             $table->boolean('allow_early_withdrawal')->default(true);
             $table->boolean('allow_partial_withdrawal')->default(false);
-            $table->decimal('early_break_fee_percent', 5, 2)->default(0.00);
+            $table->decimal('early_break_fee_percent', 5, 2)->default(2.50);
             $table->decimal('early_break_interest_forfeit_percent', 5, 2)->default(100.00);
             $table->decimal('maturity_fee_percent', 5, 2)->default(1.50);
             $table->string('compounding_frequency', 20)->default('daily');

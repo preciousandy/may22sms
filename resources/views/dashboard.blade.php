@@ -34,15 +34,9 @@
     <!-- 1. OPay Signature Emerald / Teal Wallet Balance Hero Card -->
     <div x-data="{ 
             showBalance: localStorage.getItem('opay_show_balance') !== 'false',
-            copiedId: false,
             toggleBalance() {
                 this.showBalance = !this.showBalance;
                 localStorage.setItem('opay_show_balance', this.showBalance);
-            },
-            copyId(id) {
-                if (navigator.clipboard) { navigator.clipboard.writeText(id); }
-                this.copiedId = true;
-                setTimeout(() => this.copiedId = false, 1500);
             }
          }"
          class="relative bg-gradient-to-br from-[#0d9488] via-[#0f766e] to-[#042f2e] rounded-3xl p-5 sm:p-7 text-white shadow-xl shadow-teal-900/15 overflow-hidden border border-teal-600/30">
@@ -72,15 +66,6 @@
                         </template>
                     </button>
                 </div>
-
-                <!-- Account ID Badge with 1-Click Copy -->
-                <button type="button" @click="copyId('{{ auth()->user()->id }}')" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-xs border border-white/15 text-xs font-mono font-bold text-teal-100 transition cursor-pointer">
-                    <span>ID: #{{ auth()->user()->id }}</span>
-                    <span x-show="!copiedId" class="text-teal-300">
-                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
-                    </span>
-                    <span x-show="copiedId" style="display:none;" class="text-[10px] text-amber-300 font-sans font-bold">Copied!</span>
-                </button>
             </div>
 
             <!-- Big High-Contrast Currency Balance Display -->

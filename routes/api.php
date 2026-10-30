@@ -28,4 +28,7 @@ Route::post('/paymentpoint/webhook', [PaymentPointWebhookController::class, 'han
 Route::post('/strollwallet/webhook', [StrollwalletWebhookController::class, 'handle']);
 Route::post('/pocketfi/webhook', [PocketFiWebhookController::class, 'handle']);
 Route::post('/monietude/webhook', [MonietudeWebhookController::class, 'handle']);
+Route::post('/webhooks/quidax', [\App\Http\Controllers\QuidaxWebhookController::class, 'handle']);
+Route::post('/quidax/webhook', [\App\Http\Controllers\QuidaxWebhookController::class, 'handle']);
+
 

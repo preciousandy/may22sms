@@ -96,12 +96,11 @@ class UserDashboardTest extends TestCase
             'account_status' => 'active',
         ]);
 
-        // 1. Receive Crypto & Convert to Naira
+        // 1. Receive Crypto & Convert to Naira (Live Quidax Off-Ramp)
         $resCrypto = $this->actingAs($user)->get('/services/crypto-to-naira');
         $resCrypto->assertStatus(200);
         $resCrypto->assertSee('Receive Crypto & Convert to Naira');
-        $resCrypto->assertSee('Launching Soon');
-        $resCrypto->assertSee('Notify Me');
+        $resCrypto->assertSee('Select Cryptocurrency');
 
         // 2. Airtime & Data (Live BigiSub Utility)
         $resAirtime = $this->actingAs($user)->get('/services/airtime-data');

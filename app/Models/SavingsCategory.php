@@ -9,6 +9,11 @@ class SavingsCategory extends Model
 {
     use HasFactory;
 
+    protected $attributes = [
+        'early_withdrawal_fee_percent' => 2.50,
+        'early_withdrawal_interest_forfeited_percent' => 100.00,
+    ];
+
     protected $fillable = [
         'name',
         'slug',

@@ -378,15 +378,32 @@ class SavingsService
                 throw new InvalidArgumentException('Plan is already closed or processed.');
             }
 
+            // If the plan has already reached or passed maturity, use existing maturity withdrawal rules
+            if ($lockedPlan->isMatured()) {
+                return $this->processMaturity($lockedPlan);
+            }
+
+            $principal = (float) $lockedPlan->principal_amount;
+            if ($principal <= 0) {
+                throw new InvalidArgumentException('No eligible savings principal available to withdraw.');
+            }
+
+            // Recalculate fee, forfeited interest, and net payout on server under lock
             $summary = $lockedPlan->calculateEarlyBreakSummary();
-            $netPayout = $summary['net_payout'];
-            $forfeitedInterest = $summary['forfeited_interest'];
+            $netPayout = (float) $summary['net_payout'];
+            $earlyBreakFee = (float) $summary['early_break_fee'];
+            $forfeitedInterest = (float) $summary['forfeited_interest'];
+            $feePercent = (float) $summary['early_break_fee_percent'];
             $currency = $lockedPlan->currency;
+
+            if ($netPayout < 0) {
+                throw new InvalidArgumentException('Invalid net payout calculated.');
+            }
 
             $payoutUsd = $this->convertToUsd($netPayout, $currency);
             $txRef = 'SSS-BRK-' . strtoupper(Str::random(12));
 
-            // Credit net payout to main wallet
+            // Credit net payout to main wallet atomically
             if ($payoutUsd > 0) {
                 $this->walletService->credit(
                     $lockedUser,
@@ -394,27 +411,48 @@ class SavingsService
                     'savings_break',
                     $txRef,
                     [
+                        'savings_plan_id' => $lockedPlan->id,
+                        'user_id' => $lockedUser->id,
                         'plan_reference' => $lockedPlan->reference,
                         'plan_name' => $lockedPlan->name,
+                        'principal' => $principal,
+                        'early_break_fee' => $earlyBreakFee,
+                        'early_break_fee_percent' => $feePercent,
+                        'forfeited_interest' => $forfeitedInterest,
                         'net_payout' => $netPayout,
                         'currency' => $currency,
-                        'forfeited_interest' => $forfeitedInterest,
+                        'transaction_reference' => $txRef,
+                        'timestamp' => now()->toIso8601String(),
                     ]
                 );
             }
 
+            $statement = [
+                'type' => 'early_withdrawal',
+                'savings_plan_id' => $lockedPlan->id,
+                'user_id' => $lockedUser->id,
+                'plan_name' => $lockedPlan->name,
+                'principal' => $principal,
+                'early_break_fee' => $earlyBreakFee,
+                'early_break_fee_percent' => $feePercent,
+                'gross_interest_earned' => (float) $lockedPlan->accrued_interest,
+                'forfeited_interest' => $forfeitedInterest,
+                'net_payout' => $netPayout,
+                'currency' => $currency,
+                'transaction_reference' => $txRef,
+                'processed_at' => now()->toIso8601String(),
+                'wallet_tx_ref' => $txRef,
+                'payout_usd' => $payoutUsd,
+            ];
+
+            // Close savings balance and mark plan as broken atomically
             $lockedPlan->status = 'broken';
             $lockedPlan->principal_amount = 0.00000000;
             $lockedPlan->broken_at = now();
             $lockedPlan->closed_at = now();
             $lockedPlan->forfeited_interest = $forfeitedInterest;
             $lockedPlan->total_withdrawn = $netPayout;
-            $lockedPlan->payout_statement = array_merge($summary, [
-                'type' => 'early_withdrawal',
-                'processed_at' => now()->toIso8601String(),
-                'wallet_tx_ref' => $txRef,
-                'payout_usd' => $payoutUsd,
-            ]);
+            $lockedPlan->payout_statement = $statement;
             $lockedPlan->save();
 
             SavingsContribution::create([
@@ -423,11 +461,11 @@ class SavingsService
                 'reference' => $txRef,
                 'type' => 'early_withdrawal',
                 'amount' => $netPayout,
-                'principal_before' => $summary['principal'],
+                'principal_before' => $principal,
                 'principal_after' => 0.00000000,
-                'description' => "Early withdrawal payout of " . ($currency === 'USD' ? '$' : '₦') . number_format($netPayout, 2) . " to main wallet",
+                'description' => "Early withdrawal payout of " . ($currency === 'USD' ? '$' : '₦') . number_format($netPayout, 2) . " to main wallet (Early break fee: " . ($currency === 'USD' ? '$' : '₦') . number_format($earlyBreakFee, 2) . ")",
                 'status' => 'completed',
-                'metadata' => $summary,
+                'metadata' => $statement,
             ]);
 
             SavingsAuditLog::record(
@@ -435,13 +473,27 @@ class SavingsService
                 $lockedUser->id,
                 $user->id,
                 'early_withdrawal_executed',
-                ['status' => 'active', 'principal' => $summary['principal']],
-                ['status' => 'broken', 'net_payout' => $netPayout, 'forfeited' => $forfeitedInterest]
+                [
+                    'status' => 'active',
+                    'principal' => $principal,
+                    'accrued_interest' => (float) $lockedPlan->accrued_interest,
+                ],
+                [
+                    'status' => 'broken',
+                    'principal' => $principal,
+                    'early_break_fee' => $earlyBreakFee,
+                    'early_break_fee_percent' => $feePercent,
+                    'forfeited_interest' => $forfeitedInterest,
+                    'net_payout' => $netPayout,
+                    'transaction_reference' => $txRef,
+                    'timestamp' => now()->toIso8601String(),
+                ]
             );
 
             return [
                 'success' => true,
                 'summary' => $summary,
+                'statement' => $statement,
                 'wallet_balance_usd' => (float) $lockedUser->walletBalance,
             ];
         });

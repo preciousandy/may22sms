@@ -261,30 +261,11 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::post('/services/electricity/pay', [\App\Http\Controllers\User\UtilityController::class, 'payElectricity'])->name('utilities.pay.electricity');
     Route::post('/services/betting/fund', [\App\Http\Controllers\User\UtilityController::class, 'fundBetting'])->name('utilities.fund.betting');
 
-    // Remaining Coming Soon Service (Crypto to Naira)
-    Route::get('/services/crypto-to-naira', function () {
-        $serviceManager = app(\App\Services\ServiceManager::class);
-        $isAvailable = $serviceManager->isAvailable('crypto_to_naira');
-        $maintenanceMessage = $serviceManager->getMaintenanceMessage('crypto_to_naira');
-
-        $serviceData = [
-            'title' => 'Receive Crypto & Convert to Naira',
-            'category' => 'Fintech & Web3',
-            'icon' => '🪙',
-            'badge' => $isAvailable ? 'NEW' : 'UNAVAILABLE',
-            'is_available' => $isAvailable,
-            'maintenance_message' => $maintenanceMessage,
-            'desc' => 'Generate dedicated deposit addresses for USDT, BTC, and ETH. Instantly auto-swap to Nigerian Naira (NGN) deposited directly into your bank account or May22SMS wallet balance with zero delay.',
-            'features' => [
-                'Zero Gas Fee Settlement on TRC20 & BEP20',
-                'Competitive Real-Time P2P Rates',
-                'Direct Bank Transfer to all Nigerian Commercial Banks & Fintechs',
-                'Automated Multi-Coin Support (USDT, BTC, ETH, SOL)',
-            ],
-        ];
-        $service = 'crypto-to-naira';
-        return view('user.coming-soon', compact('serviceData', 'service', 'isAvailable', 'maintenanceMessage'));
-    })->name('services.coming-soon');
+    // Receive Crypto & Convert to Naira (Quidax Integration)
+    Route::get('/services/crypto-to-naira', [\App\Http\Controllers\User\CryptoController::class, 'index'])->name('services.crypto-to-naira');
+    Route::post('/services/crypto-to-naira/quote', [\App\Http\Controllers\User\CryptoController::class, 'quote'])->name('crypto.quote');
+    Route::post('/services/crypto-to-naira/create', [\App\Http\Controllers\User\CryptoController::class, 'create'])->name('crypto.create');
+    Route::get('/services/crypto-to-naira/status/{reference}', [\App\Http\Controllers\User\CryptoController::class, 'status'])->name('crypto.status');
 });
 
 // Admin Protected Routes
@@ -298,6 +279,7 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::post('/savings/categories', [\App\Http\Controllers\Admin\SavingsController::class, 'storeCategory'])->name('admin.savings.categories.store');
     Route::post('/savings/categories/{id}', [\App\Http\Controllers\Admin\SavingsController::class, 'updateCategory'])->name('admin.savings.categories.update');
     Route::post('/savings/categories/{id}/toggle-interest', [\App\Http\Controllers\Admin\SavingsController::class, 'toggleCategoryInterest'])->name('admin.savings.categories.toggle-interest');
+    Route::post('/savings/categories/{id}/break-fee', [\App\Http\Controllers\Admin\SavingsController::class, 'updateBreakFee'])->name('admin.savings.categories.update-break-fee');
     Route::get('/savings/reconciliation', [\App\Http\Controllers\Admin\SavingsController::class, 'reconciliation'])->name('admin.savings.reconciliation');
     Route::get('/savings/{id}', [\App\Http\Controllers\Admin\SavingsController::class, 'show'])->name('admin.savings.show');
 
@@ -420,7 +402,18 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::post('/utilities/settings', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'updateSettings'])->name('admin.utilities.settings');
     Route::post('/utilities/{id}/reconcile', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'reconcile'])->name('admin.utilities.reconcile');
     Route::post('/utilities/{id}/refund', [\App\Http\Controllers\Admin\UtilityAdminController::class, 'refund'])->name('admin.utilities.refund');
+
+    // Quidax Crypto Off-Ramp Admin Management
+    Route::get('/crypto', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'index'])->name('admin.crypto.index');
+    Route::post('/crypto/{id}/reconcile', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'reconcile'])->name('admin.crypto.reconcile');
+    Route::post('/crypto/toggle-service', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'toggleService'])->name('admin.crypto.toggle');
 });
+
+// Quidax Webhook Endpoints
+Route::post('/api/webhooks/quidax', [\App\Http\Controllers\QuidaxWebhookController::class, 'handle']);
+Route::post('/webhooks/quidax', [\App\Http\Controllers\QuidaxWebhookController::class, 'handle']);
+Route::post('/quidax/webhook', [\App\Http\Controllers\QuidaxWebhookController::class, 'handle']);
+
 
 Route::get('/test-mail', function () {
     try {

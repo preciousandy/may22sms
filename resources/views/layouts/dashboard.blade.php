@@ -218,7 +218,7 @@
                     </div>
                     <div class="overflow-hidden">
                         <div class="text-xs font-black text-slate-800 truncate">{{ auth()->user()->name ?? 'User' }}</div>
-                        <div class="text-[10px] font-bold text-slate-400 truncate">ID: #{{ auth()->user()->id ?? 0 }}</div>
+                        <div class="text-[10px] font-bold text-slate-400 truncate">{{ auth()->user()->email ?? '' }}</div>
                     </div>
                 </div>
                 <a href="/logout" class="p-2 text-slate-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition" title="Log out">
@@ -271,7 +271,6 @@
                                     <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                                     Verified
                                 </span>
-                                <span class="text-[10px] font-bold text-slate-400 hidden sm:inline">#{{ auth()->user()->id ?? 0 }}</span>
                             </div>
                         </div>
                     </div>

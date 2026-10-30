@@ -13,4 +13,17 @@ class ServiceUnavailableException extends RuntimeException
         parent::__construct($message, $code, $previous);
         $this->serviceKey = $serviceKey;
     }
+
+    public function render($request)
+    {
+        if ($request->expectsJson() || $request->wantsJson() || $request->is('api/*')) {
+            return response()->json([
+                'status' => 'error',
+                'service' => $this->serviceKey,
+                'message' => $this->getMessage(),
+            ], 403);
+        }
+
+        return redirect()->back()->with('error', $this->getMessage());
+    }
 }

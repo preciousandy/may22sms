@@ -37,13 +37,13 @@
 }" 
 x-cloak
 x-show="show && current"
-x-transition:enter="transition ease-out duration-500 transform"
-x-transition:enter-start="opacity-0 translate-y-8 scale-95"
+x-transition:enter="transition ease-out duration-400 transform"
+x-transition:enter-start="opacity-0 -translate-y-4 sm:translate-y-6 scale-95"
 x-transition:enter-end="opacity-100 translate-y-0 scale-100"
 x-transition:leave="transition ease-in duration-300 transform"
 x-transition:leave-start="opacity-100 translate-y-0 scale-100"
-x-transition:leave-end="opacity-0 translate-y-4 scale-95"
-class="fixed bottom-6 left-6 z-40 max-w-sm w-full sm:w-80">
+x-transition:leave-end="opacity-0 -translate-y-4 sm:translate-y-4 scale-95"
+class="fixed top-4 left-3 right-3 sm:top-auto sm:right-auto sm:left-6 sm:bottom-6 z-50 max-w-sm sm:w-80 mx-auto sm:mx-0">
 
     <div class="bg-white/95 backdrop-blur-md rounded-2xl p-4 shadow-2xl border border-gray-100 flex items-start gap-3.5 relative overflow-hidden group">
         <!-- Accent indicator bar -->

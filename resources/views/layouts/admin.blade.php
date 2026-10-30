@@ -254,6 +254,16 @@ x-init="
                         Funding Charges
                     </a>
 
+                    <a href="/admin/crypto" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/crypto') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <svg class="w-4 h-4 mr-3 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                            Crypto Off-Ramp
+                        </span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-black uppercase {{ config('quidax.env') === 'production' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-400 border border-amber-500/30' }}">
+                            {{ config('quidax.env') === 'production' ? 'LIVE' : 'TEST' }}
+                        </span>
+                    </a>
+
                     <!-- Save Small Small Admin Section -->
                     <div class="space-y-1">
                         <a href="/admin/savings" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ ($isActive('admin/savings') && !request()->is('admin/savings/categories*') && !request()->is('admin/savings/reconciliation*')) ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
