@@ -378,7 +378,10 @@
         <div id="priceTierSection" class="rounded-2xl border-2 border-gray-200/80 bg-gray-50/60 p-4 sm:p-5">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
                 <div>
-                    <label for="priceTierSelect" class="text-xs font-black uppercase tracking-wider text-gray-600 block">5. Speed / Price Tier <span class="text-[#0d9488]">(Higher = Faster Code)</span></label>
+                    <label for="priceTierSelect" class="text-xs font-black uppercase tracking-wider text-gray-600 flex items-center gap-2">
+                        <span>5. Speed / Price Tier <span class="text-[#0d9488]">(Higher = Faster Code)</span></span>
+                        <span id="priceTierLoading" class="hidden text-[10px] font-bold text-[#0d9488] animate-pulse">Loading speed tiers...</span>
+                    </label>
                     <p class="text-[11px] text-gray-500 mt-0.5">Pick a higher price tier for faster and more reliable SMS code delivery.</p>
                 </div>
                 <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-teal-200 shadow-sm self-start sm:self-auto">
@@ -632,6 +635,7 @@
     let selectedPrice = 0;
     let selectedMaxPrice = null;
     let priceTierRequestToken = 0;
+    const priceTiersCache = {};
     const currencySymbol = @js($currencySymbol ?? '$');
     const currencyFx = {{ (float) ($currencyFx ?? 1) }};
     const userWalletBalance = {{ (float) ($walletBal ?? 0) }};
@@ -648,6 +652,7 @@
     const priceTierSection = document.getElementById('priceTierSection');
     const priceTierContainer = document.getElementById('priceTierContainer');
     const priceTierSelect = document.getElementById('priceTierSelect');
+    const priceTierLoading = document.getElementById('priceTierLoading');
     const priceDisplay = document.getElementById('priceDisplay');
     const buyBtn = document.getElementById('buyBtn');
     const promoCodeInput = document.getElementById('promoCodeInput');
@@ -794,8 +799,12 @@
         const country = (provider === 'daisysms') ? 'usa' : (countrySelect.value || 'usa');
 
         try {
-            const response = await fetch(`/api/sms/services?provider=${provider}&country=${country}`);
-            const data = await response.json();
+            const servicesPromise = fetch(`/api/sms/services?provider=${provider}&country=${country}`).then(r => r.json());
+            const prefetchService = selectedServiceKey || 'whatsapp';
+            if (provider === 'herosms') {
+                fetchPriceTiersData(provider, country, prefetchService);
+            }
+            const data = await servicesPromise;
             currentServicesData = data;
             serviceLoadingIndicator.textContent = 'Live pricing loaded';
 
@@ -929,12 +938,54 @@
         loadPriceTiers(serviceKey);
     }
 
+    async function fetchPriceTiersData(provider, country, serviceKey) {
+        const cacheKey = `${provider}:${country}:${serviceKey}`;
+        if (priceTiersCache[cacheKey]) {
+            return priceTiersCache[cacheKey];
+        }
+        const promise = fetch(`/api/sms/price-tiers?provider=${encodeURIComponent(provider)}&country=${encodeURIComponent(country)}&service=${encodeURIComponent(serviceKey)}`)
+            .then(r => r.json())
+            .then(tiers => {
+                if (Array.isArray(tiers) && tiers.length > 0) {
+                    priceTiersCache[cacheKey] = tiers;
+                }
+                return tiers;
+            })
+            .catch(() => null);
+        priceTiersCache[cacheKey] = promise;
+        const result = await promise;
+        if (!Array.isArray(result) || result.length === 0) {
+            delete priceTiersCache[cacheKey];
+        }
+        return result;
+    }
+
+    function populatePriceTierSelect(tiers, serviceKey) {
+        if (!Array.isArray(tiers) || tiers.length === 0) return;
+
+        priceTierSelect.innerHTML = '';
+        tiers.forEach((tier, idx) => {
+            const effective = calculateEffectivePrice(tier.cost, serviceKey);
+            const opt = document.createElement('option');
+            opt.value = tier.max_price !== null && tier.max_price !== undefined ? String(tier.max_price) : '';
+            opt.dataset.basePrice = String(tier.cost);
+            opt.dataset.price = String(effective);
+            const availTxt = tier.count ? ` (${Number(tier.count).toLocaleString()} avail)` : '';
+            opt.textContent = `${tier.label} — ${currencySymbol}${(effective * currencyFx).toFixed(2)}${idx > 0 ? availTxt : ''}`;
+            priceTierSelect.appendChild(opt);
+        });
+
+        priceTierSelect.selectedIndex = tiers.length > 1 ? 1 : 0;
+        applySelectedPricing();
+    }
+
     async function loadPriceTiers(serviceKey) {
         const provider = getSelectedProvider();
         if (!priceTierSelect || !priceTierContainer) return;
 
         if (provider !== 'herosms') {
             if (priceTierSection) priceTierSection.classList.add('hidden');
+            if (priceTierLoading) priceTierLoading.classList.add('hidden');
             priceTierContainer.classList.add('hidden');
             priceTierSelect.innerHTML = '<option value="">Standard (Default)</option>';
             selectedMaxPrice = null;
@@ -945,37 +996,29 @@
         priceTierContainer.classList.remove('hidden');
         const token = ++priceTierRequestToken;
         const country = countrySelect.value || 'usa';
+        const cacheKey = `${provider}:${country}:${serviceKey}`;
+
+        // Use cached tiers immediately if already resolved
+        if (Array.isArray(priceTiersCache[cacheKey])) {
+            if (priceTierLoading) priceTierLoading.classList.add('hidden');
+            populatePriceTierSelect(priceTiersCache[cacheKey], serviceKey);
+            return;
+        }
 
         // Default option while loading
         const baseEffective = calculateEffectivePrice(selectedBasePrice, serviceKey);
-        priceTierSelect.innerHTML = `<option value="" data-base-price="${selectedBasePrice}" data-price="${baseEffective}">Standard (Default) — ${currencySymbol}${(baseEffective * currencyFx).toFixed(2)}</option>`;
+        priceTierSelect.innerHTML = `<option value="" data-base-price="${selectedBasePrice}" data-price="${baseEffective}">Standard — ${currencySymbol}${(baseEffective * currencyFx).toFixed(2)}</option>`;
         selectedMaxPrice = null;
+        if (priceTierLoading) priceTierLoading.classList.remove('hidden');
 
         try {
-            const res = await fetch(`/api/sms/price-tiers?provider=${encodeURIComponent(provider)}&country=${encodeURIComponent(country)}&service=${encodeURIComponent(serviceKey)}`);
-            const tiers = await res.json();
+            const tiers = await fetchPriceTiersData(provider, country, serviceKey);
             if (token !== priceTierRequestToken) return;
-
-            if (!Array.isArray(tiers) || tiers.length === 0) {
-                return;
+            populatePriceTierSelect(tiers, serviceKey);
+        } finally {
+            if (token === priceTierRequestToken && priceTierLoading) {
+                priceTierLoading.classList.add('hidden');
             }
-
-            priceTierSelect.innerHTML = '';
-            tiers.forEach((tier, idx) => {
-                const effective = calculateEffectivePrice(tier.cost, serviceKey);
-                const opt = document.createElement('option');
-                opt.value = tier.max_price !== null && tier.max_price !== undefined ? String(tier.max_price) : '';
-                opt.dataset.basePrice = String(tier.cost);
-                opt.dataset.price = String(effective);
-                const availTxt = tier.count ? ` (${Number(tier.count).toLocaleString()} avail)` : '';
-                opt.textContent = `${tier.label} — ${currencySymbol}${(effective * currencyFx).toFixed(2)}${idx > 0 ? availTxt : ''}`;
-                priceTierSelect.appendChild(opt);
-            });
-
-            priceTierSelect.selectedIndex = tiers.length > 1 ? 1 : 0;
-            applySelectedPricing();
-        } catch (e) {
-            // Keep default tier on network error
         }
     }
 

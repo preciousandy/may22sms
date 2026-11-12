@@ -182,22 +182,6 @@ class SmsController extends Controller
         if (isset($prices[$country])) {
             $countryData = $prices[$country];
 
-            if ($smsProvider === 'herosms') {
-                $heroOperators = $this->heroSms->getOperators($country);
-                if (!empty($heroOperators)) {
-                    foreach ($countryData as $service => &$operators) {
-                        if (isset($operators['any'])) {
-                            foreach ($heroOperators as $op) {
-                                if (!isset($operators[$op])) {
-                                    $operators[$op] = $operators['any'];
-                                }
-                            }
-                        }
-                    }
-                    unset($operators);
-                }
-            }
-
             // Apply markup & minimum 1500 NGN floor (and Singapore WhatsApp 20,000 NGN override)
             foreach ($countryData as $service => &$operators) {
                 $markupPercent = $this->resolveSmsMarkupPercent((string) $country, (string) $service);

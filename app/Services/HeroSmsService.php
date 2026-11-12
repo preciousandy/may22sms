@@ -413,7 +413,7 @@ class HeroSmsService
             return [];
         }
 
-        $countriesData = Cache::remember('herosms:free_price:' . $serviceCode, 120, function () use ($serviceCode) {
+        $countriesData = Cache::remember('herosms:free_price:' . $serviceCode, 300, function () use ($serviceCode) {
             $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
 
             foreach ($urlsToTry as $url) {

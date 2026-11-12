@@ -87,7 +87,7 @@ class SmsControllerTest extends TestCase
         $this->assertEquals('PENDING', $order->fresh()->status);
     }
 
-    public function test_get_services_includes_herosms_operators()
+    public function test_get_services_returns_herosms_prices_with_markup()
     {
         $user = User::factory()->create();
         $this->actingAs($user);
@@ -107,11 +107,6 @@ class SmsControllerTest extends TestCase
                 ],
             ]);
 
-        $heroSmsMock->expects($this->once())
-            ->method('getOperators')
-            ->with('usa')
-            ->willReturn(['at_t', 'verizon']);
-
         $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
         $request = Request::create('/api/sms/services', 'GET', [
             'provider' => 'herosms',
@@ -123,9 +118,7 @@ class SmsControllerTest extends TestCase
 
         $this->assertArrayHasKey('whatsapp', $data);
         $this->assertArrayHasKey('any', $data['whatsapp']);
-        $this->assertArrayHasKey('at_t', $data['whatsapp']);
-        $this->assertArrayHasKey('verizon', $data['whatsapp']);
-        $this->assertEquals($data['whatsapp']['any']['cost'], $data['whatsapp']['verizon']['cost']);
+        $this->assertGreaterThanOrEqual(2.00, $data['whatsapp']['any']['cost']);
     }
 
     public function test_get_price_tiers_applies_markup_and_returns_higher_tiers()
