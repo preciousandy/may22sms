@@ -279,7 +279,25 @@ class HeroSmsService
                                         $cost = (float) $details['cost'];
                                         $count = (int) ($details['count'] ?? 999);
                                     } else {
-                                        // Take the first available tier/price if nested
+                                        // Support nested per-operator pricing if provided
+                                        $serviceName = $this->resolveServiceName((string) $service);
+                                        $opMap = [];
+                                        foreach ($details as $opKey => $opVal) {
+                                            if (is_array($opVal) && (isset($opVal['cost']) || isset($opVal['price']))) {
+                                                $opCost = (float) ($opVal['cost'] ?? $opVal['price'] ?? 0.0);
+                                                if ($opCost > 0) {
+                                                    $opMap[(string) $opKey] = [
+                                                        'cost' => $opCost,
+                                                        'count' => (int) ($opVal['count'] ?? 999),
+                                                    ];
+                                                }
+                                            }
+                                        }
+                                        if (!empty($opMap)) {
+                                            $result[$countryKey][$serviceName] = $opMap;
+                                            continue;
+                                        }
+
                                         $first = reset($details);
                                         if (is_array($first)) {
                                             $cost = (float) ($first['cost'] ?? $first['price'] ?? 0.0);
@@ -320,6 +338,144 @@ class HeroSmsService
         });
     }
 
+    /**
+     * Fetch available mobile network operators for a given country from HeroSMS.
+     */
+    public function getOperators(string $country): array
+    {
+        $countryKey = strtolower(trim($country));
+
+        if (empty($this->apiKey)) {
+            return [];
+        }
+
+        $countryId = $this->resolveCountryId($countryKey);
+        if ($countryId === null) {
+            return [];
+        }
+
+        return Cache::remember('herosms:operators:' . $countryKey, 300, function () use ($countryKey, $countryId) {
+            $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
+
+            foreach ($urlsToTry as $url) {
+                try {
+                    $response = Http::timeout(15)->get($url, [
+                        'api_key' => $this->apiKey,
+                        'action' => 'getOperators',
+                        'country' => $countryId,
+                    ]);
+
+                    $body = trim((string) $response->body());
+                    $decoded = json_decode($body, true);
+
+                    if (is_array($decoded) && isset($decoded['countryOperators']) && is_array($decoded['countryOperators'])) {
+                        $rawList = $decoded['countryOperators'][$countryId]
+                            ?? $decoded['countryOperators'][(string) $countryId]
+                            ?? [];
+
+                        if (is_array($rawList)) {
+                            $operators = [];
+                            foreach ($rawList as $op) {
+                                $opStr = trim((string) $op);
+                                if ($opStr !== '' && strtolower($opStr) !== 'any') {
+                                    $operators[] = $opStr;
+                                }
+                            }
+
+                            return array_values(array_unique($operators));
+                        }
+                    }
+
+                    if ($body !== '') {
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("HeroSMS getOperators exception for {$url} ({$countryKey}): " . $e->getMessage());
+                }
+            }
+
+            return [];
+        });
+    }
+
+    /**
+     * Fetch dynamic price tiers (freePriceMap / maxPrice) for a country and service from HeroSMS.
+     *
+     * @return array<int, array{price: float, count: int}>
+     */
+    public function getPriceTiers(string $country, string $product): array
+    {
+        $countryKey = strtolower(trim($country));
+        $serviceCode = $this->resolveServiceCode($product);
+        $countryId = $this->resolveCountryId($countryKey);
+
+        if (empty($this->apiKey) || $countryId === null || $serviceCode === '') {
+            return [];
+        }
+
+        $countriesData = Cache::remember('herosms:free_price:' . $serviceCode, 120, function () use ($serviceCode) {
+            $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
+
+            foreach ($urlsToTry as $url) {
+                try {
+                    $response = Http::timeout(15)->get($url, [
+                        'api_key' => $this->apiKey,
+                        'action' => 'getTopCountriesByService',
+                        'service' => $serviceCode,
+                        'freePrice' => 'true',
+                    ]);
+
+                    $body = trim((string) $response->body());
+                    $decoded = json_decode($body, true);
+
+                    if (is_array($decoded) && !isset($decoded['title'])) {
+                        return $decoded;
+                    }
+
+                    if ($body !== '') {
+                        break;
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning("HeroSMS getPriceTiers exception for {$url} ({$serviceCode}): " . $e->getMessage());
+                }
+            }
+
+            return [];
+        });
+
+        if (!is_array($countriesData)) {
+            return [];
+        }
+
+        $targetEntry = null;
+        foreach ($countriesData as $entry) {
+            if (is_array($entry) && isset($entry['country']) && (int) $entry['country'] === $countryId) {
+                $targetEntry = $entry;
+                break;
+            }
+        }
+
+        if (!$targetEntry || empty($targetEntry['freePriceMap']) || !is_array($targetEntry['freePriceMap'])) {
+            return [];
+        }
+
+        $tiers = [];
+        foreach ($targetEntry['freePriceMap'] as $priceStr => $countVal) {
+            $p = round((float) $priceStr, 4);
+            $c = (int) $countVal;
+            if ($p > 0 && $c > 0) {
+                $tiers[(string) $p] = [
+                    'price' => $p,
+                    'count' => $c,
+                ];
+            }
+        }
+
+        usort($tiers, fn ($a, $b) => $a['price'] <=> $b['price']);
+
+        return $tiers;
+    }
+
     public function getBalance(): array
     {
         $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
@@ -353,13 +509,18 @@ class HeroSmsService
         return ['error' => 'Failed to get balance from provider.'];
     }
 
-    public function buyNumber(string $country, string $operator, string $product): array
+    public function buyNumber(string $country, string $operator, string $product, ?float $maxPrice = null): array
     {
         $countryKey = strtolower($country);
         $prices = $this->getPrices($countryKey);
         $fallbackPrice = 0.0;
-        if (isset($prices[$countryKey][$product]['any']['cost'])) {
+        if (isset($prices[$countryKey][$product][$operator]['cost'])) {
+            $fallbackPrice = (float) $prices[$countryKey][$product][$operator]['cost'];
+        } elseif (isset($prices[$countryKey][$product]['any']['cost'])) {
             $fallbackPrice = (float) $prices[$countryKey][$product]['any']['cost'];
+        }
+        if ($maxPrice !== null && $maxPrice > 0) {
+            $fallbackPrice = max($fallbackPrice, $maxPrice);
         }
 
         $urlsToTry = array_filter([$this->baseUrl, ...$this->backupBaseUrls]);
@@ -381,6 +542,10 @@ class HeroSmsService
 
                 if (!empty($operator) && $operator !== 'any') {
                     $params['operator'] = $operator;
+                }
+
+                if ($maxPrice !== null && $maxPrice > 0) {
+                    $params['maxPrice'] = round($maxPrice, 4);
                 }
 
                 $response = Http::timeout(45)->get($url, $params);
@@ -414,6 +579,8 @@ class HeroSmsService
 
                 if ($body === 'NO_NUMBERS' || str_contains(strtolower($body), 'try again')) {
                     $lastError = 'No numbers available right now for this service. Please try again later.';
+                } elseif ($body === 'WRONG_MAX_PRICE' || str_contains($body, 'WRONG_MAX_PRICE')) {
+                    $lastError = 'Selected price tier is too low for available numbers. Please select a higher price tier.';
                 } elseif ($body === 'NO_BALANCE') {
                     $lastError = 'Provider balance is low. Please contact support.';
                 } elseif ($body === 'WRONG_KEY' || $body === 'BAD_KEY' || $body === 'WRONG_API_KEY') {

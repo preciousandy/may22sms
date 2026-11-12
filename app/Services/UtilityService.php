@@ -17,11 +17,21 @@ class UtilityService
 {
     protected BigiSubService $bigiSubService;
     protected WalletService $walletService;
+    protected UtilityPricingService $pricingService;
 
-    public function __construct(BigiSubService $bigiSubService, WalletService $walletService)
-    {
+    public function __construct(
+        BigiSubService $bigiSubService,
+        WalletService $walletService,
+        ?UtilityPricingService $pricingService = null
+    ) {
         $this->bigiSubService = $bigiSubService;
         $this->walletService = $walletService;
+        $this->pricingService = $pricingService ?: app(UtilityPricingService::class);
+    }
+
+    public function getPricingService(): UtilityPricingService
+    {
+        return $this->pricingService;
     }
 
     /**
@@ -29,7 +39,7 @@ class UtilityService
      */
     public function getExchangeRate(): float
     {
-        return (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500.0);
+        return $this->pricingService->getExchangeRate();
     }
 
     /**
@@ -84,20 +94,32 @@ class UtilityService
         }
 
         $amountNgn = (float) ($data['amount'] ?? 0);
-        if ($amountNgn < 50 || $amountNgn > 50000) {
-            throw new InvalidArgumentException('Airtime amount must be between ₦50 and ₦50,000.');
+        
+        // Calculate authoritative server-side pricing & profit
+        $pricing = $this->pricingService->calculateAirtimePricing($amountNgn, $network);
+        if (!$pricing['is_enabled']) {
+            throw new RuntimeException('Airtime recharge service is currently disabled.');
         }
 
-        $rate = $this->getExchangeRate();
-        $discountPercent = (float) (Setting::where('key', 'utility_airtime_discount_percent')->value('value') ?? 2.0); // e.g. 2% cashback discount
-        $discountNgn = round($amountNgn * ($discountPercent / 100.0), 4);
-        $finalNgn = max(1.0, $amountNgn - $discountNgn);
-        $amountUsd = $this->convertNgnToUsd($finalNgn);
+        $amountUsd = $pricing['total_customer_usd'];
+        $discountNgn = $pricing['discount_ngn'];
+        $feeNgn = $pricing['fee_ngn'];
+        $sellingPriceNgn = $pricing['selling_price_ngn'];
+        $providerCostNgn = $pricing['wholesale_cost_ngn'];
+        $providerCostUsd = $pricing['wholesale_cost_usd'];
+        $profitNgn = $pricing['profit_ngn'];
+        $profitUsd = $pricing['profit_usd'];
+        $rate = $pricing['exchange_rate'];
+        $snapshot = $pricing['snapshot'];
 
         $reference = 'UTL-AIR-' . strtoupper(Str::random(12));
 
         // 1. Atomically debit user wallet and record transaction in pending state
-        $tx = DB::transaction(function () use ($user, $reference, $network, $phone, $amountNgn, $amountUsd, $discountNgn, $rate, $ip, $userAgent) {
+        $tx = DB::transaction(function () use (
+            $user, $reference, $network, $phone, $amountNgn, $amountUsd, 
+            $discountNgn, $feeNgn, $sellingPriceNgn, $providerCostNgn, $providerCostUsd, 
+            $profitNgn, $profitUsd, $rate, $snapshot, $ip, $userAgent
+        ) {
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
 
             if ((float) $lockedUser->walletBalance < $amountUsd) {
@@ -115,6 +137,7 @@ class UtilityService
                     'network' => strtoupper($network),
                     'phone_number' => $phone,
                     'amount_ngn' => $amountNgn,
+                    'total_charged_ngn' => $sellingPriceNgn + $feeNgn,
                 ]
             );
 
@@ -127,8 +150,15 @@ class UtilityService
                 'customer_target' => $phone,
                 'amount_ngn' => $amountNgn,
                 'amount_usd' => $amountUsd,
+                'provider_cost_ngn' => $providerCostNgn,
+                'provider_cost_usd' => $providerCostUsd,
+                'selling_price_ngn' => $sellingPriceNgn,
+                'fee_ngn' => $feeNgn,
                 'discount_ngn' => $discountNgn,
                 'total_charged_usd' => $amountUsd,
+                'profit_ngn' => $profitNgn,
+                'profit_usd' => $profitUsd,
+                'pricing_snapshot' => $snapshot,
                 'exchange_rate' => $rate,
                 'status' => 'pending',
                 'ip_address' => $ip,
@@ -136,12 +166,13 @@ class UtilityService
                 'request_payload' => [
                     'network' => $network,
                     'phone' => $phone,
+                    'amount' => $amountNgn,
                     'amount_ngn' => $amountNgn,
                 ],
             ]);
         });
 
-        // 2. Dispatch to BigiSub
+        // 2. Dispatch to BigiSub (Face value $amountNgn is recharged)
         $res = $this->bigiSubService->purchaseAirtime($network, $phone, $amountNgn, $reference);
 
         return $this->finalizeTransaction($tx, $res, $amountUsd, 'Airtime top-up');
@@ -171,10 +202,10 @@ class UtilityService
             throw new InvalidArgumentException('Please select a valid data bundle plan.');
         }
 
-        // Fetch plan catalog to verify price and name
-        $plans = $this->bigiSubService->getDataPlans($network);
+        // Fetch verified raw wholesale catalog from BigiSub
+        $rawPlans = $this->bigiSubService->getRawDataPlans($network);
         $selectedPlan = null;
-        foreach ($plans as $p) {
+        foreach ($rawPlans as $p) {
             if ((string) ($p['id'] ?? '') === (string) $planId) {
                 $selectedPlan = $p;
                 break;
@@ -186,18 +217,34 @@ class UtilityService
         }
 
         $planName = $selectedPlan['name'] ?? ($selectedPlan['size'] ?? 'Data Bundle');
-        $amountNgn = (float) ($selectedPlan['price_ngn'] ?? ($selectedPlan['price'] ?? 0));
-        if ($amountNgn <= 0) {
-            throw new InvalidArgumentException('Invalid plan price detected.');
+        $wholesaleNgn = (float) ($selectedPlan['plan_amount'] ?? ($selectedPlan['price_ngn'] ?? ($selectedPlan['price'] ?? 0)));
+        if ($wholesaleNgn <= 0) {
+            throw new InvalidArgumentException('Invalid provider plan price detected.');
         }
 
-        $rate = $this->getExchangeRate();
-        $amountUsd = $this->convertNgnToUsd($amountNgn);
+        // Calculate authoritative server-side pricing & markup
+        $pricing = $this->pricingService->calculateDataPricing($wholesaleNgn, $network);
+        if (!$pricing['is_enabled']) {
+            throw new RuntimeException('Data bundle service is currently disabled.');
+        }
+
+        $amountNgn = $pricing['selling_price_ngn']; // Customer face value / selling price
+        $amountUsd = $pricing['total_customer_usd'];
+        $providerCostNgn = $pricing['wholesale_cost_ngn'];
+        $providerCostUsd = $pricing['wholesale_cost_usd'];
+        $profitNgn = $pricing['profit_ngn'];
+        $profitUsd = $pricing['profit_usd'];
+        $rate = $pricing['exchange_rate'];
+        $snapshot = $pricing['snapshot'];
 
         $reference = 'UTL-DAT-' . strtoupper(Str::random(12));
 
         // Debit wallet
-        $tx = DB::transaction(function () use ($user, $reference, $network, $planId, $planName, $phone, $amountNgn, $amountUsd, $rate, $ip, $userAgent) {
+        $tx = DB::transaction(function () use (
+            $user, $reference, $network, $planId, $planName, $phone, 
+            $amountNgn, $amountUsd, $providerCostNgn, $providerCostUsd, 
+            $profitNgn, $profitUsd, $rate, $snapshot, $ip, $userAgent
+        ) {
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
 
             if ((float) $lockedUser->walletBalance < $amountUsd) {
@@ -229,7 +276,15 @@ class UtilityService
                 'customer_target' => $phone,
                 'amount_ngn' => $amountNgn,
                 'amount_usd' => $amountUsd,
+                'provider_cost_ngn' => $providerCostNgn,
+                'provider_cost_usd' => $providerCostUsd,
+                'selling_price_ngn' => $amountNgn,
+                'fee_ngn' => 0.0,
+                'discount_ngn' => 0.0,
                 'total_charged_usd' => $amountUsd,
+                'profit_ngn' => $profitNgn,
+                'profit_usd' => $profitUsd,
+                'pricing_snapshot' => $snapshot,
                 'exchange_rate' => $rate,
                 'status' => 'pending',
                 'ip_address' => $ip,
@@ -243,7 +298,7 @@ class UtilityService
             ]);
         });
 
-        // Dispatch to provider
+        // Dispatch to provider with exact plan ID
         $res = $this->bigiSubService->purchaseData($network, $planId, $phone, $reference);
 
         return $this->finalizeTransaction($tx, $res, $amountUsd, 'Data bundle delivery');
@@ -285,17 +340,32 @@ class UtilityService
         }
 
         $phone = preg_replace('/[^0-9]/', '', (string) ($data['phone_number'] ?? $user->phone_number ?? '08000000000'));
-        $amountNgn = (float) ($data['amount'] ?? 0);
-        if ($amountNgn < 500 || $amountNgn > 500000) {
-            throw new InvalidArgumentException('Electricity payment amount must be between ₦500 and ₦500,000.');
+        $amountNgn = (float) ($data['amount'] ?? 0); // Meter recharge face value
+
+        // Calculate authoritative server-side pricing & convenience fee
+        $pricing = $this->pricingService->calculateElectricityPricing($amountNgn);
+        if (!$pricing['is_enabled']) {
+            throw new RuntimeException('Electricity bill payment service is currently disabled.');
         }
 
-        $rate = $this->getExchangeRate();
-        $amountUsd = $this->convertNgnToUsd($amountNgn);
+        $feeNgn = $pricing['fee_ngn']; // Platform convenience fee
+        $amountUsd = $pricing['total_customer_usd'];
+        $sellingPriceNgn = $pricing['selling_price_ngn'];
+        $providerCostNgn = $pricing['wholesale_cost_ngn']; // Exactly $amountNgn
+        $providerCostUsd = $pricing['wholesale_cost_usd'];
+        $profitNgn = $pricing['profit_ngn'];
+        $profitUsd = $pricing['profit_usd'];
+        $rate = $pricing['exchange_rate'];
+        $snapshot = $pricing['snapshot'];
 
         $reference = 'UTL-ELC-' . strtoupper(Str::random(12));
 
-        $tx = DB::transaction(function () use ($user, $reference, $disco, $supportedDiscos, $meterNumber, $meterType, $customerName, $phone, $amountNgn, $amountUsd, $rate, $ip, $userAgent) {
+        $tx = DB::transaction(function () use (
+            $user, $reference, $disco, $supportedDiscos, $meterNumber, $meterType, 
+            $customerName, $phone, $amountNgn, $amountUsd, $feeNgn, $sellingPriceNgn,
+            $providerCostNgn, $providerCostUsd, $profitNgn, $profitUsd, $rate, $snapshot, 
+            $ip, $userAgent
+        ) {
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
 
             if ((float) $lockedUser->walletBalance < $amountUsd) {
@@ -314,6 +384,8 @@ class UtilityService
                     'meter_type' => $meterType,
                     'customer_name' => $customerName,
                     'amount_ngn' => $amountNgn,
+                    'fee_ngn' => $feeNgn,
+                    'total_charged_ngn' => $amountNgn + $feeNgn,
                 ]
             );
 
@@ -329,7 +401,15 @@ class UtilityService
                 'meter_type' => $meterType,
                 'amount_ngn' => $amountNgn,
                 'amount_usd' => $amountUsd,
+                'provider_cost_ngn' => $providerCostNgn,
+                'provider_cost_usd' => $providerCostUsd,
+                'selling_price_ngn' => $sellingPriceNgn,
+                'fee_ngn' => $feeNgn,
+                'discount_ngn' => 0.0,
                 'total_charged_usd' => $amountUsd,
+                'profit_ngn' => $profitNgn,
+                'profit_usd' => $profitUsd,
+                'pricing_snapshot' => $snapshot,
                 'exchange_rate' => $rate,
                 'status' => 'pending',
                 'ip_address' => $ip,
@@ -338,13 +418,14 @@ class UtilityService
                     'disco' => $disco,
                     'meter_number' => $meterNumber,
                     'meter_type' => $meterType,
+                    'amount' => $amountNgn,
                     'customer_name' => $customerName,
                     'phone' => $phone,
                 ],
             ]);
         });
 
-        // Dispatch to provider
+        // Dispatch to provider with ONLY the meter face value $amountNgn (NOT including the convenience fee)
         $res = $this->bigiSubService->payElectricity($disco, $meterNumber, $meterType, $amountNgn, $customerName, $phone, $reference);
 
         return $this->finalizeTransaction($tx, $res, $amountUsd, 'Electricity bill payment');
@@ -379,18 +460,32 @@ class UtilityService
             $customerName = $verifyRes['customer_name'] ?? 'Verified Bettor';
         }
 
-        $minAmount = $supportedPlatforms[$platform]['min'] ?? 100;
-        $amountNgn = (float) ($data['amount'] ?? 0);
-        if ($amountNgn < $minAmount || $amountNgn > 500000) {
-            throw new InvalidArgumentException("Betting funding amount must be between ₦" . number_format($minAmount) . " and ₦500,000.");
+        $amountNgn = (float) ($data['amount'] ?? 0); // Requested funding amount
+
+        // Calculate authoritative server-side pricing & processing fee
+        $pricing = $this->pricingService->calculateBettingPricing($amountNgn);
+        if (!$pricing['is_enabled']) {
+            throw new RuntimeException('Betting wallet top-up is currently disabled.');
         }
 
-        $rate = $this->getExchangeRate();
-        $amountUsd = $this->convertNgnToUsd($amountNgn);
+        $feeNgn = $pricing['fee_ngn']; // Processing fee
+        $amountUsd = $pricing['total_customer_usd'];
+        $sellingPriceNgn = $pricing['selling_price_ngn'];
+        $providerCostNgn = $pricing['wholesale_cost_ngn']; // Exactly $amountNgn
+        $providerCostUsd = $pricing['wholesale_cost_usd'];
+        $profitNgn = $pricing['profit_ngn'];
+        $profitUsd = $pricing['profit_usd'];
+        $rate = $pricing['exchange_rate'];
+        $snapshot = $pricing['snapshot'];
 
         $reference = 'UTL-BET-' . strtoupper(Str::random(12));
 
-        $tx = DB::transaction(function () use ($user, $reference, $platform, $supportedPlatforms, $customerId, $customerName, $amountNgn, $amountUsd, $rate, $ip, $userAgent) {
+        $tx = DB::transaction(function () use (
+            $user, $reference, $platform, $supportedPlatforms, $customerId, 
+            $customerName, $amountNgn, $amountUsd, $feeNgn, $sellingPriceNgn, 
+            $providerCostNgn, $providerCostUsd, $profitNgn, $profitUsd, $rate, 
+            $snapshot, $ip, $userAgent
+        ) {
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
 
             if ((float) $lockedUser->walletBalance < $amountUsd) {
@@ -408,6 +503,8 @@ class UtilityService
                     'customer_id' => $customerId,
                     'customer_name' => $customerName,
                     'amount_ngn' => $amountNgn,
+                    'fee_ngn' => $feeNgn,
+                    'total_charged_ngn' => $amountNgn + $feeNgn,
                 ]
             );
 
@@ -422,7 +519,15 @@ class UtilityService
                 'customer_name' => $customerName,
                 'amount_ngn' => $amountNgn,
                 'amount_usd' => $amountUsd,
+                'provider_cost_ngn' => $providerCostNgn,
+                'provider_cost_usd' => $providerCostUsd,
+                'selling_price_ngn' => $sellingPriceNgn,
+                'fee_ngn' => $feeNgn,
+                'discount_ngn' => 0.0,
                 'total_charged_usd' => $amountUsd,
+                'profit_ngn' => $profitNgn,
+                'profit_usd' => $profitUsd,
+                'pricing_snapshot' => $snapshot,
                 'exchange_rate' => $rate,
                 'status' => 'pending',
                 'ip_address' => $ip,
@@ -431,12 +536,13 @@ class UtilityService
                     'platform' => $platform,
                     'customer_id' => $customerId,
                     'customer_name' => $customerName,
+                    'amount' => $amountNgn,
                     'amount_ngn' => $amountNgn,
                 ],
             ]);
         });
 
-        // Dispatch to provider
+        // Dispatch to provider with ONLY the funding amount $amountNgn (NOT including the processing fee)
         $res = $this->bigiSubService->fundBetting($platform, $customerId, $amountNgn, $reference);
 
         return $this->finalizeTransaction($tx, $res, $amountUsd, 'Betting wallet top-up');

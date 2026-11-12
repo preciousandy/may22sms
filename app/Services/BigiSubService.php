@@ -328,12 +328,12 @@ class BigiSubService
     /**
      * 2. Data Plans Catalog & Purchase.
      */
-    public function getDataPlans(string $network): array
+    public function getRawDataPlans(string $network): array
     {
         $networkId = $this->getNetworkId($network);
         $networkKey = strtolower($network);
 
-        return Cache::remember("bigisub_data_plans_{$networkId}", 3600, function () use ($networkId, $networkKey) {
+        return Cache::remember("bigisub_raw_data_plans_{$networkId}", 3600, function () use ($networkId, $networkKey) {
             if (!$this->simulate && $this->isConfigured()) {
                 $res = $this->request('GET', '/api/v2/vtu/data/plans/');
                 $rawList = null;
@@ -379,6 +379,12 @@ class BigiSubService
             // Verified default wholesale data catalog for Nigerian networks
             return $this->getDefaultDataPlans($networkKey, $networkId);
         });
+    }
+
+    public function getDataPlans(string $network): array
+    {
+        $rawPlans = $this->getRawDataPlans($network);
+        return app(UtilityPricingService::class)->applyDataMarkupToPlans($rawPlans, $network);
     }
 
     public function purchaseData(string $network, int|string $planId, string $phoneNumber, string $reference): array

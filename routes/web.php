@@ -174,6 +174,7 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
 
     Route::get('/sms-verify', [SmsController::class, 'index']);
     Route::get('/api/sms/services', [SmsController::class, 'getServices']);
+    Route::get('/api/sms/price-tiers', [SmsController::class, 'getPriceTiers']);
     Route::post('/api/sms/buy', [SmsController::class, 'buyNumber']);
     Route::get('/api/sms/check/{id}', [SmsController::class, 'checkSms']);
     Route::post('/api/sms/cancel/{id}', [SmsController::class, 'cancelOrder']);
@@ -253,6 +254,7 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::get('/user/utilities/receipt/{reference}', [\App\Http\Controllers\User\UtilityController::class, 'receipt'])->name('user.utilities.receipt');
 
     Route::get('/api/utilities/plans', [\App\Http\Controllers\User\UtilityController::class, 'getPlans'])->name('utilities.api.plans');
+    Route::get('/api/utilities/quote', [\App\Http\Controllers\User\UtilityController::class, 'quote'])->name('utilities.api.quote');
     Route::post('/api/utilities/verify-meter', [\App\Http\Controllers\User\UtilityController::class, 'verifyMeter'])->name('utilities.api.verify-meter');
     Route::post('/api/utilities/verify-betting', [\App\Http\Controllers\User\UtilityController::class, 'verifyBetting'])->name('utilities.api.verify-betting');
 

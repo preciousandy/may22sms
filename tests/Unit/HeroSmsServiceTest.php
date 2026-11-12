@@ -70,4 +70,87 @@ class HeroSmsServiceTest extends TestCase
 
         $this->assertEquals('CANCELED', $result['status']);
     }
+
+    public function test_get_operators_returns_country_operators()
+    {
+        \Illuminate\Support\Facades\Cache::forget('herosms:operators:usa');
+
+        Http::fake([
+            'https://hero-sms.com/stubs/handler_api.php*' => Http::response(
+                '{"status":"success","countryOperators":{"187":["any","at_t","tmobile","verizon"]}}',
+                200
+            ),
+        ]);
+
+        $service = new HeroSmsService();
+        $operators = $service->getOperators('usa');
+
+        $this->assertEquals(['at_t', 'tmobile', 'verizon'], $operators);
+    }
+
+    public function test_buy_number_sends_selected_operator()
+    {
+        \Illuminate\Support\Facades\Cache::forget('herosms:prices:usa');
+
+        Http::fake([
+            'https://hero-sms.com/stubs/handler_api.php*' => Http::sequence()
+                ->push('{"whatsapp":{"cost":2.6,"count":15}}', 200)
+                ->push('ACCESS_NUMBER:9002:19876543211', 200, ['X-Price' => '2.80']),
+        ]);
+
+        $service = new HeroSmsService();
+        $result = $service->buyNumber('usa', 'verizon', 'whatsapp');
+
+        $this->assertEquals('9002', $result['id']);
+        $this->assertEquals('verizon', $result['operator']);
+        $this->assertEquals(2.80, $result['price']);
+
+        Http::assertSent(function ($request) {
+            return ($request['action'] ?? null) === 'getNumber'
+                && ($request['operator'] ?? null) === 'verizon';
+        });
+    }
+
+    public function test_get_price_tiers_parses_free_price_map()
+    {
+        \Illuminate\Support\Facades\Cache::forget('herosms:free_price:wa');
+
+        Http::fake([
+            'https://hero-sms.com/stubs/handler_api.php*' => Http::response(
+                '{"0":{"country":36,"price":0.4,"retail_price":0.52,"count":1000,"freePriceMap":{"0.52":100,"0.81":500,"2.50":900,"5.00":1000}}}',
+                200
+            ),
+        ]);
+
+        $service = new HeroSmsService();
+        $tiers = $service->getPriceTiers('canada', 'whatsapp');
+
+        $this->assertCount(4, $tiers);
+        $this->assertEquals(0.52, $tiers[0]['price']);
+        $this->assertEquals(5.0, $tiers[3]['price']);
+        $this->assertEquals(1000, $tiers[3]['count']);
+    }
+
+    public function test_buy_number_sends_max_price_when_provided()
+    {
+        \Illuminate\Support\Facades\Cache::forget('herosms:prices:canada');
+
+        Http::fake([
+            'https://hero-sms.com/stubs/handler_api.php*' => Http::sequence()
+                ->push('{"whatsapp":{"cost":0.52,"count":100}}', 200)
+                ->push('ACCESS_NUMBER:9003:14165550199', 200, ['X-Price' => '2.50']),
+        ]);
+
+        $service = new HeroSmsService();
+        $result = $service->buyNumber('canada', 'verizon', 'whatsapp', 2.50);
+
+        $this->assertEquals('9003', $result['id']);
+        $this->assertEquals(2.50, $result['price']);
+
+        Http::assertSent(function ($request) {
+            return ($request['action'] ?? null) === 'getNumber'
+                && ($request['operator'] ?? null) === 'verizon'
+                && (float) ($request['maxPrice'] ?? 0) === 2.5;
+        });
+    }
 }

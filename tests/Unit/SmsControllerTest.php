@@ -86,4 +86,93 @@ class SmsControllerTest extends TestCase
         $this->assertStringContainsString('Please wait', $responseData['message']);
         $this->assertEquals('PENDING', $order->fresh()->status);
     }
+
+    public function test_get_services_includes_herosms_operators()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $fiveSimMock = $this->createMock(FiveSimService::class);
+        $daisySmsMock = $this->createMock(DaisySmsService::class);
+        $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+
+        $heroSmsMock->expects($this->once())
+            ->method('getPrices')
+            ->with('usa')
+            ->willReturn([
+                'usa' => [
+                    'whatsapp' => [
+                        'any' => ['cost' => 2.00, 'count' => 100],
+                    ],
+                ],
+            ]);
+
+        $heroSmsMock->expects($this->once())
+            ->method('getOperators')
+            ->with('usa')
+            ->willReturn(['at_t', 'verizon']);
+
+        $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
+        $request = Request::create('/api/sms/services', 'GET', [
+            'provider' => 'herosms',
+            'country' => 'usa',
+        ]);
+
+        $response = $controller->getServices($request);
+        $data = $response->getData(true);
+
+        $this->assertArrayHasKey('whatsapp', $data);
+        $this->assertArrayHasKey('any', $data['whatsapp']);
+        $this->assertArrayHasKey('at_t', $data['whatsapp']);
+        $this->assertArrayHasKey('verizon', $data['whatsapp']);
+        $this->assertEquals($data['whatsapp']['any']['cost'], $data['whatsapp']['verizon']['cost']);
+    }
+
+    public function test_get_price_tiers_applies_markup_and_returns_higher_tiers()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $fiveSimMock = $this->createMock(FiveSimService::class);
+        $daisySmsMock = $this->createMock(DaisySmsService::class);
+        $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+
+        $heroSmsMock->expects($this->once())
+            ->method('getPrices')
+            ->with('canada')
+            ->willReturn([
+                'canada' => [
+                    'whatsapp' => [
+                        'any' => ['cost' => 1.00, 'count' => 100],
+                    ],
+                ],
+            ]);
+
+        $heroSmsMock->expects($this->once())
+            ->method('getPriceTiers')
+            ->with('canada', 'whatsapp')
+            ->willReturn([
+                ['price' => 1.00, 'count' => 100],
+                ['price' => 1.50, 'count' => 500],
+                ['price' => 3.00, 'count' => 1000],
+            ]);
+
+        $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
+        $request = Request::create('/api/sms/price-tiers', 'GET', [
+            'provider' => 'herosms',
+            'country' => 'canada',
+            'service' => 'whatsapp',
+        ]);
+
+        $response = $controller->getPriceTiers($request);
+        $tiers = $response->getData(true);
+
+        $this->assertCount(3, $tiers);
+        $this->assertEquals('standard', $tiers[0]['id']);
+        $this->assertNull($tiers[0]['max_price']);
+        $this->assertEquals(1.50, $tiers[1]['max_price']);
+        $this->assertEquals(3.00, $tiers[2]['max_price']);
+        $this->assertGreaterThan($tiers[0]['cost'], $tiers[1]['cost']);
+        $this->assertGreaterThan($tiers[1]['cost'], $tiers[2]['cost']);
+    }
 }

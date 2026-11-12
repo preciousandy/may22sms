@@ -138,6 +138,14 @@
                 <span>How to Use</span>
             </a>
 
+            <!-- WhatsApp Direct Support -->
+            <a href="https://wa.me/16573369673?text=Hello%20May22SMS%20Support%2C%20I%20need%20help%20with%20SMS%20verification." target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-2xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200/80 text-xs font-black transition">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.54 1.771.82 2.788.82 3.185 0 5.772-2.587 5.773-5.767.001-3.182-2.585-5.805-5.77-5.805zm3.376 8.21c-.14.394-.712.729-1.02.775-.297.045-.67.073-2.138-.535-1.748-.724-2.859-2.5-2.946-2.617-.087-.116-.708-.941-.708-1.794 0-.853.447-1.272.607-1.447.16-.175.349-.219.465-.219.117 0 .233.001.335.006.107.005.251-.041.393.3.146.35.496 1.21.54 1.297.044.088.073.19.015.306-.059.117-.088.19-.175.292-.087.102-.185.228-.264.306-.088.087-.179.182-.077.357.102.175.454.748.974 1.211.67.597 1.235.782 1.41.87.175.088.277.073.38-.044.102-.117.437-.51.554-.685.117-.175.234-.146.394-.088.16.059 1.02.481 1.195.568.175.088.291.131.335.204.044.073.044.423-.096.817z"/>
+                </svg>
+                <span>WhatsApp Support</span>
+            </a>
+
             <!-- Wallet Balance Badge with Quick Top-Up -->
             <div class="flex items-center gap-2 bg-gray-100/80 hover:bg-gray-100 border border-gray-200/60 px-3.5 py-1.5 rounded-2xl transition">
                 <span class="text-xs text-gray-500 font-medium">Wallet:</span>
@@ -366,13 +374,42 @@
             </select>
         </div>
 
-        <!-- Advanced Accordion: Operator, Promo, Premium -->
-        <div class="pt-2">
+        <!-- 5. Speed / Price Tier Selection (Visible for HeroSMS) -->
+        <div id="priceTierSection" class="rounded-2xl border-2 border-gray-200/80 bg-gray-50/60 p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+                <div>
+                    <label for="priceTierSelect" class="text-xs font-black uppercase tracking-wider text-gray-600 block">5. Speed / Price Tier <span class="text-[#0d9488]">(Higher = Faster Code)</span></label>
+                    <p class="text-[11px] text-gray-500 mt-0.5">Pick a higher price tier for faster and more reliable SMS code delivery.</p>
+                </div>
+                <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white border border-teal-200 shadow-sm self-start sm:self-auto">
+                    <span class="text-[11px] font-bold text-gray-500">Selected Amount:</span>
+                    <span class="text-sm font-black text-[#0d9488]" id="operatorAmountDisplay">{{ $currencySymbol ?? '$' }}0.00</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 items-start">
+                <div id="priceTierContainer">
+                    <select id="priceTierSelect" class="block w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-0 focus:border-[#0d9488] text-sm font-semibold bg-white transition">
+                        <option value="">Standard (Default)</option>
+                    </select>
+                </div>
+
+                <div class="rounded-xl bg-amber-50/90 border border-amber-200/80 px-3.5 py-2.5 text-[11px] text-amber-900 flex items-start gap-2">
+                    <span class="text-sm leading-none mt-0.5">⚡</span>
+                    <span>
+                        <strong>Faster Code Tip:</strong> Not receiving codes on Standard? Choose a higher <strong>Speed / Price Tier</strong> — <strong>the higher the price, the faster and more reliably you will receive your code.</strong>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Advanced Accordion: Promo & Premium -->
+        <div class="pt-1">
             <details class="group rounded-2xl border border-gray-200/80 bg-gray-50/50 p-4 transition [&_summary::-webkit-details-marker]:hidden">
                 <summary class="flex items-center justify-between cursor-pointer font-bold text-xs text-gray-700 hover:text-gray-900">
                     <span class="flex items-center gap-2">
                         <span>⚙️</span>
-                        <span>Advanced Options: Carrier Network & Promo Code</span>
+                        <span>Advanced Options: Promo Code & Priority Routing</span>
                     </span>
                     <span class="text-gray-400 transition group-open:rotate-180">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
@@ -380,17 +417,8 @@
                 </summary>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200/60">
-                    <!-- Operator Dropdown -->
-                    <div>
-                        <label class="block text-xs font-bold text-gray-700 mb-1">Carrier Network Operator</label>
-                        <select id="operatorSelect" class="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-0 focus:border-[#0d9488] text-xs font-medium bg-white">
-                            <option value="any">Any / Best Route (Recommended)</option>
-                        </select>
-                        <span class="text-[10px] text-gray-400 mt-1 block">Default: "Any" provides highest availability.</span>
-                    </div>
-
                     <!-- Promo Code -->
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="block text-xs font-bold text-gray-700 mb-1">Promo Code</label>
                         <input type="text" id="promoCodeInput" class="block w-full px-3.5 py-2.5 border border-gray-300 rounded-xl focus:ring-0 focus:border-[#0d9488] text-xs font-mono bg-white uppercase" placeholder="e.g. DISCOUNT10">
                         <span class="text-[10px] text-gray-400 mt-1 block">Optional discount code</span>
@@ -602,6 +630,8 @@
     let selectedServiceKey = '';
     let selectedBasePrice = 0;
     let selectedPrice = 0;
+    let selectedMaxPrice = null;
+    let priceTierRequestToken = 0;
     const currencySymbol = @js($currencySymbol ?? '$');
     const currencyFx = {{ (float) ($currencyFx ?? 1) }};
     const userWalletBalance = {{ (float) ($walletBal ?? 0) }};
@@ -614,7 +644,10 @@
     const serviceSearch = document.getElementById('serviceSearch');
     const serviceSearchResults = document.getElementById('serviceSearchResults');
     const serviceSelect = document.getElementById('serviceSelect');
-    const operatorSelect = document.getElementById('operatorSelect');
+    const operatorAmountDisplay = document.getElementById('operatorAmountDisplay');
+    const priceTierSection = document.getElementById('priceTierSection');
+    const priceTierContainer = document.getElementById('priceTierContainer');
+    const priceTierSelect = document.getElementById('priceTierSelect');
     const priceDisplay = document.getElementById('priceDisplay');
     const buyBtn = document.getElementById('buyBtn');
     const promoCodeInput = document.getElementById('promoCodeInput');
@@ -857,51 +890,123 @@
         renderOperators(serviceKey);
     }
 
+    function formatOperatorName(op) {
+        const key = (op || '').toLowerCase();
+        const map = {
+            'any': 'Any / Best Available (Recommended)',
+            'at_t': 'AT&T',
+            'tmobile': 'T-Mobile',
+            'physic': 'Physical SIM',
+            'o2': 'O2',
+            'ee': 'EE',
+            'us_mobile': 'US Mobile',
+            'h2o_wireless': 'H2O Wireless',
+        };
+        if (map[key]) return map[key];
+        return key
+            .split('_')
+            .filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+    }
+
     function renderOperators(serviceKey) {
-        operatorSelect.innerHTML = '';
         const serviceData = currentServicesData[serviceKey];
         if (!serviceData) return;
 
-        const operators = Object.keys(serviceData);
-        let bestPrice = 0;
-        let bestRaw = 0;
-        let totalCount = 0;
+        const firstKey = Object.keys(serviceData)[0];
+        const firstDetails = serviceData['any'] || (firstKey ? serviceData[firstKey] : null);
+        const totalCount = firstDetails ? (firstDetails.count || 0) : 0;
 
-        operators.forEach((op, idx) => {
-            const details = serviceData[op];
-            if (details.count > 0 || idx === 0) {
-                totalCount += (details.count || 0);
-                const effective = calculateEffectivePrice(details.cost, serviceKey);
-
-                if (idx === 0) {
-                    bestPrice = effective;
-                    bestRaw = parseFloat(details.cost);
-                }
-
-                const opt = document.createElement('option');
-                opt.value = op;
-                opt.dataset.basePrice = String(details.cost);
-                opt.dataset.price = String(effective);
-                opt.textContent = `${op === 'any' ? 'Any / Best Available' : op} - ${currencySymbol}${(effective * currencyFx).toFixed(2)}`;
-                operatorSelect.appendChild(opt);
-            }
-        });
-
-        // Auto select first option
-        if (operatorSelect.options.length > 0) {
-            operatorSelect.selectedIndex = 0;
-            selectedBasePrice = bestRaw;
-            selectedPrice = bestPrice;
+        if (firstDetails) {
+            selectedBasePrice = parseFloat(firstDetails.cost || 0);
+            selectedPrice = calculateEffectivePrice(firstDetails.cost, serviceKey);
         }
 
         summaryStock.textContent = `${totalCount || 'Multiple'} numbers available in pool`;
+        selectedMaxPrice = null;
+        updatePriceAndButton();
+        loadPriceTiers(serviceKey);
+    }
+
+    async function loadPriceTiers(serviceKey) {
+        const provider = getSelectedProvider();
+        if (!priceTierSelect || !priceTierContainer) return;
+
+        if (provider !== 'herosms') {
+            if (priceTierSection) priceTierSection.classList.add('hidden');
+            priceTierContainer.classList.add('hidden');
+            priceTierSelect.innerHTML = '<option value="">Standard (Default)</option>';
+            selectedMaxPrice = null;
+            return;
+        }
+
+        if (priceTierSection) priceTierSection.classList.remove('hidden');
+        priceTierContainer.classList.remove('hidden');
+        const token = ++priceTierRequestToken;
+        const country = countrySelect.value || 'usa';
+
+        // Default option while loading
+        const baseEffective = calculateEffectivePrice(selectedBasePrice, serviceKey);
+        priceTierSelect.innerHTML = `<option value="" data-base-price="${selectedBasePrice}" data-price="${baseEffective}">Standard (Default) — ${currencySymbol}${(baseEffective * currencyFx).toFixed(2)}</option>`;
+        selectedMaxPrice = null;
+
+        try {
+            const res = await fetch(`/api/sms/price-tiers?provider=${encodeURIComponent(provider)}&country=${encodeURIComponent(country)}&service=${encodeURIComponent(serviceKey)}`);
+            const tiers = await res.json();
+            if (token !== priceTierRequestToken) return;
+
+            if (!Array.isArray(tiers) || tiers.length === 0) {
+                return;
+            }
+
+            priceTierSelect.innerHTML = '';
+            tiers.forEach((tier, idx) => {
+                const effective = calculateEffectivePrice(tier.cost, serviceKey);
+                const opt = document.createElement('option');
+                opt.value = tier.max_price !== null && tier.max_price !== undefined ? String(tier.max_price) : '';
+                opt.dataset.basePrice = String(tier.cost);
+                opt.dataset.price = String(effective);
+                const availTxt = tier.count ? ` (${Number(tier.count).toLocaleString()} avail)` : '';
+                opt.textContent = `${tier.label} — ${currencySymbol}${(effective * currencyFx).toFixed(2)}${idx > 0 ? availTxt : ''}`;
+                priceTierSelect.appendChild(opt);
+            });
+
+            priceTierSelect.selectedIndex = tiers.length > 1 ? 1 : 0;
+            applySelectedPricing();
+        } catch (e) {
+            // Keep default tier on network error
+        }
+    }
+
+    function applySelectedPricing() {
+        const tierOpt = priceTierSelect ? priceTierSelect.options[priceTierSelect.selectedIndex] : null;
+        if (tierOpt && tierOpt.dataset.price) {
+            selectedMaxPrice = tierOpt.value !== '' ? parseFloat(tierOpt.value) : null;
+            selectedBasePrice = parseFloat(tierOpt.dataset.basePrice || '0');
+            selectedPrice = parseFloat(tierOpt.dataset.price || '0');
+        } else if (currentServicesData && selectedServiceKey && currentServicesData[selectedServiceKey]) {
+            const serviceData = currentServicesData[selectedServiceKey];
+            const firstKey = Object.keys(serviceData)[0];
+            const firstDetails = serviceData['any'] || (firstKey ? serviceData[firstKey] : null);
+            if (firstDetails) {
+                selectedMaxPrice = null;
+                selectedBasePrice = parseFloat(firstDetails.cost || 0);
+                selectedPrice = calculateEffectivePrice(firstDetails.cost, selectedServiceKey);
+            }
+        }
+
         updatePriceAndButton();
     }
 
     function updatePriceAndButton() {
         const finalPrice = selectedPrice;
         const finalConverted = finalPrice * currencyFx;
-        priceDisplay.textContent = `${currencySymbol}${finalConverted.toFixed(2)}`;
+        const formattedAmount = `${currencySymbol}${finalConverted.toFixed(2)}`;
+        priceDisplay.textContent = formattedAmount;
+        if (operatorAmountDisplay) {
+            operatorAmountDisplay.textContent = formattedAmount;
+        }
 
         // Check if user has sufficient balance
         if (userWalletBalance < finalPrice) {
@@ -910,7 +1015,7 @@
             buyBtn.title = "Please top up your wallet to continue.";
         } else {
             buyBtn.disabled = false;
-            buyBtn.innerHTML = `<span>⚡ Get Phone Number (${currencySymbol}${finalConverted.toFixed(2)})</span>`;
+            buyBtn.innerHTML = `<span>⚡ Get Phone Number (${formattedAmount})</span>`;
             buyBtn.title = "";
         }
     }
@@ -976,14 +1081,11 @@
         loadServices();
     });
 
-    operatorSelect.addEventListener('change', (e) => {
-        const opt = e.target.options[e.target.selectedIndex];
-        if (opt && opt.dataset.price) {
-            selectedBasePrice = parseFloat(opt.dataset.basePrice || '0');
-            selectedPrice = parseFloat(opt.dataset.price || '0');
-            updatePriceAndButton();
-        }
-    });
+    if (priceTierSelect) {
+        priceTierSelect.addEventListener('change', () => {
+            applySelectedPricing();
+        });
+    }
 
     if (premiumToggle) {
         premiumToggle.addEventListener('change', () => {
@@ -1032,8 +1134,9 @@
                     provider: provider,
                     country: country,
                     product: selectedServiceKey,
-                    operator: operatorSelect.value || 'any',
+                    operator: 'any',
                     price: selectedPrice,
+                    max_price: selectedMaxPrice,
                     promo_code: promoCodeInput ? promoCodeInput.value.trim() : '',
                     is_premium: isPremiumSelected()
                 })

@@ -182,6 +182,22 @@ class SmsController extends Controller
         if (isset($prices[$country])) {
             $countryData = $prices[$country];
 
+            if ($smsProvider === 'herosms') {
+                $heroOperators = $this->heroSms->getOperators($country);
+                if (!empty($heroOperators)) {
+                    foreach ($countryData as $service => &$operators) {
+                        if (isset($operators['any'])) {
+                            foreach ($heroOperators as $op) {
+                                if (!isset($operators[$op])) {
+                                    $operators[$op] = $operators['any'];
+                                }
+                            }
+                        }
+                    }
+                    unset($operators);
+                }
+            }
+
             // Apply markup & minimum 1500 NGN floor (and Singapore WhatsApp 20,000 NGN override)
             foreach ($countryData as $service => &$operators) {
                 $markupPercent = $this->resolveSmsMarkupPercent((string) $country, (string) $service);
@@ -205,6 +221,95 @@ class SmsController extends Controller
         return response()->json([]);
     }
 
+    public function getPriceTiers(Request $request)
+    {
+        $smsProvider = $this->resolveSmsProvider(null, $request->input('provider'));
+        if ($smsProvider !== 'herosms') {
+            return response()->json([]);
+        }
+
+        $country = strtolower((string) $request->input('country', 'usa'));
+        $service = strtolower(trim((string) $request->input('service', '')));
+        if ($service === '') {
+            return response()->json([]);
+        }
+
+        $prices = $this->heroSms->getPrices($country);
+        $baseEntry = $prices[$country][$service]['any'] ?? null;
+        if (!is_array($baseEntry) || !isset($baseEntry['cost'])) {
+            return response()->json([]);
+        }
+
+        $markupPercent = $this->resolveSmsMarkupPercent($country, $service);
+        $multiplier = 1 + ($markupPercent / 100);
+        $baseProviderCost = (float) $baseEntry['cost'];
+        $baseUserCost = $this->applyMinPriceFloor(round($baseProviderCost * $multiplier, 2), $country, $service);
+
+        $tiers = [
+            [
+                'id' => 'standard',
+                'label' => 'Standard',
+                'max_price' => null,
+                'provider_cost' => $baseProviderCost,
+                'cost' => $baseUserCost,
+                'count' => (int) ($baseEntry['count'] ?? 0),
+            ],
+        ];
+
+        $rawTiers = $this->heroSms->getPriceTiers($country, $service);
+        $higherCandidates = [];
+        $lastUserCost = $baseUserCost;
+
+        foreach ($rawTiers as $tier) {
+            $p = (float) ($tier['price'] ?? 0);
+            if ($p <= $baseProviderCost) {
+                continue;
+            }
+            $userCost = $this->applyMinPriceFloor(round($p * $multiplier, 2), $country, $service);
+            if ($userCost <= $lastUserCost) {
+                continue;
+            }
+            $higherCandidates[] = [
+                'provider_cost' => $p,
+                'cost' => $userCost,
+                'count' => (int) ($tier['count'] ?? 0),
+            ];
+            $lastUserCost = $userCost;
+        }
+
+        if (!empty($higherCandidates)) {
+            $picked = [];
+            $total = count($higherCandidates);
+            if ($total <= 4) {
+                $picked = $higherCandidates;
+            } else {
+                $indices = array_unique([
+                    0,
+                    (int) floor(($total - 1) / 3),
+                    (int) floor((2 * ($total - 1)) / 3),
+                    $total - 1,
+                ]);
+                foreach ($indices as $idx) {
+                    $picked[] = $higherCandidates[$idx];
+                }
+            }
+
+            $labels = ['Fast Priority (Default)', 'High Priority', 'Express Priority', 'Instant / Max Priority'];
+            foreach ($picked as $i => $item) {
+                $tiers[] = [
+                    'id' => (string) $item['provider_cost'],
+                    'label' => $labels[$i] ?? ('Priority Tier ' . ($i + 1)),
+                    'max_price' => $item['provider_cost'],
+                    'provider_cost' => $item['provider_cost'],
+                    'cost' => $item['cost'],
+                    'count' => $item['count'],
+                ];
+            }
+        }
+
+        return response()->json($tiers);
+    }
+
     public function buyNumber(Request $request, WalletService $wallet)
     {
         $serviceManager = app(\App\Services\ServiceManager::class);
@@ -221,6 +326,7 @@ class SmsController extends Controller
             'product' => 'required|string',
             'operator' => 'required|string',
             'price' => 'required|numeric',
+            'max_price' => 'nullable|numeric|min:0',
             'promo_code' => 'nullable|string|max:40',
             'is_premium' => 'nullable|boolean',
         ]);
@@ -243,6 +349,9 @@ class SmsController extends Controller
             }
         $product = (string) $request->product;
         $operator = (string) $request->operator;
+        $maxPrice = ($smsProvider === 'herosms' && $request->filled('max_price') && (float) $request->input('max_price') > 0)
+            ? (float) $request->input('max_price')
+            : null;
 
         $premiumEnabled = $this->smsPremiumEnabled();
         $premiumPercent = $this->smsPremiumMarkupPercent();
@@ -251,7 +360,12 @@ class SmsController extends Controller
         $price = null;
         try {
             $prices = $smsService->getPrices($country);
-            $providerCost = $prices[$country][$product][$operator]['cost'] ?? null;
+            $providerCost = $prices[$country][$product][$operator]['cost']
+                ?? $prices[$country][$product]['any']['cost']
+                ?? null;
+            if ($maxPrice !== null) {
+                $providerCost = is_numeric($providerCost) ? max((float) $providerCost, $maxPrice) : $maxPrice;
+            }
             if (is_numeric($providerCost)) {
                 $markupPercent = $this->resolveSmsMarkupPercent($country, $product);
                 $estimated = round(((float) $providerCost) * (1 + ($markupPercent / 100)), 2);
@@ -279,7 +393,9 @@ class SmsController extends Controller
             return response()->json(['success' => false, 'message' => 'Insufficient wallet balance.'], 400);
         }
 
-        $response = $smsService->buyNumber($country, $operator, $product);
+        $response = $smsProvider === 'herosms'
+            ? $smsService->buyNumber($country, $operator, $product, $maxPrice)
+            : $smsService->buyNumber($country, $operator, $product);
 
         if (isset($response['id']) && isset($response['phone'])) {
             $markupPercent = $this->resolveSmsMarkupPercent($country, $product);

@@ -145,9 +145,38 @@
 
                 <div>
                     <span class="text-gray-400 text-[10px] uppercase font-bold block">Charged to User Wallet</span>
-                    <span class="font-extrabold text-emerald-600 text-sm">${{ number_format((float)$tx->total_charged_usd, 8) }} USD</span>
+                    <span class="font-extrabold text-gray-900 text-sm">₦{{ number_format((float)($tx->selling_price_ngn ?: ($tx->amount_ngn - $tx->discount_ngn + $tx->fee_ngn)), 2) }}</span>
+                    <span class="text-emerald-600 text-[11px] font-mono block">${{ number_format((float)$tx->total_charged_usd, 8) }} USD</span>
                     @if($tx->discount_ngn > 0)
                         <span class="text-teal-600 text-[10px] font-bold block">₦{{ number_format((float)$tx->discount_ngn, 2) }} discount applied</span>
+                    @endif
+                    @if($tx->fee_ngn > 0)
+                        <span class="text-blue-600 text-[10px] font-bold block">+₦{{ number_format((float)$tx->fee_ngn, 2) }} service/convenience fee</span>
+                    @endif
+                </div>
+
+                <div>
+                    <span class="text-gray-400 text-[10px] uppercase font-bold block">Wholesale Provider Cost</span>
+                    @if($tx->provider_cost_ngn !== null)
+                        <span class="font-extrabold text-gray-900 text-sm">₦{{ number_format((float)$tx->provider_cost_ngn, 2) }}</span>
+                        <span class="text-gray-500 text-[11px] font-mono block">${{ number_format((float)$tx->provider_cost_usd, 8) }} USD</span>
+                    @else
+                        <span class="font-bold text-gray-400 text-xs">Unspecified</span>
+                    @endif
+                </div>
+
+                <div>
+                    <span class="text-gray-400 text-[10px] uppercase font-bold block">Gross Platform Profit</span>
+                    @php $p = (float)$tx->profit_ngn; @endphp
+                    @if($tx->profit_ngn !== null)
+                        <div class="flex items-center gap-1.5 mt-0.5">
+                            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black {{ $p >= 0 ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800' }}">
+                                {{ $p >= 0 ? '+' : '' }}₦{{ number_format($p, 2) }}
+                            </span>
+                            <span class="text-gray-500 text-[10px] font-mono">({{ $p >= 0 ? '+' : '' }}${{ number_format((float)$tx->profit_usd, 6) }})</span>
+                        </div>
+                    @else
+                        <span class="font-bold text-gray-400 text-xs">—</span>
                     @endif
                 </div>
 
@@ -179,6 +208,34 @@
         </div>
 
     </div>
+
+    @if($tx->pricing_snapshot)
+    <!-- Immutable Pricing Snapshot Audit -->
+    <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-3">
+        <h3 class="text-xs font-black uppercase tracking-wider text-gray-500 flex items-center justify-between pb-2 border-b border-gray-100">
+            <span>Server-side Pricing Snapshot (Audit Trail)</span>
+            <span class="text-[10px] text-gray-400 font-mono">Captured at transaction creation</span>
+        </h3>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            @foreach($tx->pricing_snapshot as $k => $v)
+                <div class="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <span class="text-gray-400 text-[10px] uppercase font-bold block font-mono">{{ str_replace('_', ' ', $k) }}</span>
+                    <span class="font-mono font-bold text-gray-900 text-xs">
+                        @if(is_bool($v))
+                            {{ $v ? 'TRUE' : 'FALSE' }}
+                        @elseif(is_array($v))
+                            {{ json_encode($v) }}
+                        @elseif(is_numeric($v))
+                            {{ $v }}
+                        @else
+                            {{ $v ?? 'null' }}
+                        @endif
+                    </span>
+                </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
 
     <!-- Diagnostic Payloads & Raw Data -->
     <div class="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm space-y-4">

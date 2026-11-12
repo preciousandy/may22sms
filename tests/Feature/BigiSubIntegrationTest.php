@@ -48,6 +48,22 @@ class BigiSubIntegrationTest extends TestCase
             ['key' => 'utility_airtime_discount_percent'],
             ['value' => '2.0']
         );
+        Setting::updateOrCreate(
+            ['key' => 'utility_data_markup_value'],
+            ['value' => '0.0']
+        );
+        Setting::updateOrCreate(
+            ['key' => 'utility_electricity_fee_value'],
+            ['value' => '0.0']
+        );
+        Setting::updateOrCreate(
+            ['key' => 'utility_betting_enabled'],
+            ['value' => '1']
+        );
+        Setting::updateOrCreate(
+            ['key' => 'utility_betting_fee_value'],
+            ['value' => '0.0']
+        );
 
         // Create test user with $100 USD (equivalent to 150,000 NGN)
         $this->user = User::factory()->create([

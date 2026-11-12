@@ -1045,19 +1045,34 @@
                 </div>
                 <div class="flex justify-between">
                     <span class="text-slate-500 font-bold">Recipient / Target:</span>
-                    <span class="font-black text-slate-800" x-text="confirmDataModal.target"></span>
+                    <span class="font-black text-slate-800 font-mono" x-text="confirmDataModal.target"></span>
                 </div>
                 <div class="flex justify-between" x-show="confirmDataModal.customerName">
                     <span class="text-slate-500 font-bold">Customer Name:</span>
                     <span class="font-black text-emerald-700" x-text="confirmDataModal.customerName"></span>
                 </div>
+
+                <!-- Fee / Discount Transparency Breakdown -->
+                <div class="flex justify-between text-slate-600" x-show="confirmDataModal.faceValueNgn && confirmDataModal.faceValueNgn != confirmDataModal.amountNgn">
+                    <span class="font-bold">Recharge / Face Value:</span>
+                    <span class="font-bold font-mono" x-text="'₦' + Number(confirmDataModal.faceValueNgn).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                </div>
+                <div class="flex justify-between text-blue-600" x-show="confirmDataModal.feeNgn > 0">
+                    <span class="font-bold" x-text="confirmDataModal.feeLabel || 'Service Fee:'"></span>
+                    <span class="font-black font-mono" x-text="'+₦' + Number(confirmDataModal.feeNgn).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                </div>
+                <div class="flex justify-between text-emerald-600" x-show="confirmDataModal.discountNgn > 0">
+                    <span class="font-bold">Instant Discount:</span>
+                    <span class="font-black font-mono" x-text="'-₦' + Number(confirmDataModal.discountNgn).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
+                </div>
+
                 <div class="flex justify-between pt-2 border-t border-slate-200">
-                    <span class="text-slate-700 font-black">Total Payable:</span>
-                    <span class="text-base font-black text-[#0d9488]" x-text="'₦' + Number(confirmDataModal.amountNgn).toLocaleString()"></span>
+                    <span class="text-slate-700 font-black">Total Customer Charge:</span>
+                    <span class="text-base font-black text-[#0d9488]" x-text="'₦' + Number(confirmDataModal.amountNgn).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})"></span>
                 </div>
                 <div class="flex justify-between text-[11px]">
                     <span class="text-slate-500">Wallet Debit (USD):</span>
-                    <span class="font-bold text-slate-700" x-text="'$' + (confirmDataModal.amountNgn / {{ $rate }}).toFixed(4) + ' USD'"></span>
+                    <span class="font-bold text-slate-700 font-mono" x-text="'$' + (confirmDataModal.amountNgn / {{ $rate }}).toFixed(4) + ' USD'"></span>
                 </div>
             </div>
 
@@ -1132,6 +1147,8 @@ function utilitiesApp() {
             glo: @json($gloPlans),
             '9mobile': @json($nineMobilePlans),
         },
+
+        pricingSettings: @json($pricingSettings ?? []),
 
         confirmDataModal: {
             title: '',
@@ -1398,6 +1415,15 @@ function utilitiesApp() {
                 alert('Please enter a valid amount (Min ₦50).');
                 return;
             }
+
+            const faceValue = Number(this.airtime.amount);
+            const discountPercent = Number(this.pricingSettings.utility_airtime_discount_percent ?? {{ $airtimeDiscount }});
+            const feeFixed = Number(this.pricingSettings.utility_airtime_fee_fixed ?? 0);
+            const feePercent = Number(this.pricingSettings.utility_airtime_fee_percent ?? 0);
+            const discountNgn = Math.round(((faceValue * discountPercent) / 100) * 100) / 100;
+            const feeNgn = Math.round((feeFixed + ((faceValue * feePercent) / 100)) * 100) / 100;
+            const totalPayable = Math.max(0, faceValue - discountNgn + feeNgn);
+
             this.confirmDataModal = {
                 title: 'Confirm Airtime Purchase',
                 service: 'Airtime Top-Up',
@@ -1405,7 +1431,11 @@ function utilitiesApp() {
                 product: 'Instant VTU Airtime',
                 target: cleanPhone,
                 customerName: '',
-                amountNgn: this.airtime.amount * (1 - ({{ $airtimeDiscount }} / 100)),
+                faceValueNgn: faceValue,
+                feeNgn: feeNgn,
+                feeLabel: 'Service Fee:',
+                discountNgn: discountNgn,
+                amountNgn: totalPayable,
                 actionType: 'airtime',
             };
             this.modalOpen = true;
@@ -1429,6 +1459,9 @@ function utilitiesApp() {
                 alert('Please select a data bundle plan.');
                 return;
             }
+
+            const sellingPrice = Number(this.dataForm.amountNgn);
+
             this.confirmDataModal = {
                 title: 'Confirm Data Bundle Purchase',
                 service: 'Data Bundle',
@@ -1436,7 +1469,11 @@ function utilitiesApp() {
                 product: this.dataForm.planName,
                 target: cleanPhone,
                 customerName: '',
-                amountNgn: this.dataForm.amountNgn,
+                faceValueNgn: sellingPrice,
+                feeNgn: 0,
+                feeLabel: '',
+                discountNgn: 0,
+                amountNgn: sellingPrice,
                 actionType: 'data',
             };
             this.modalOpen = true;
@@ -1464,6 +1501,16 @@ function utilitiesApp() {
                 }
             }
 
+            const rechargeAmount = Number(this.electricity.amount);
+            const feeMethod = this.pricingSettings.utility_electricity_fee_method || 'fixed';
+            let feeNgn = 0;
+            if (feeMethod === 'fixed') {
+                feeNgn = Number(this.pricingSettings.utility_electricity_fee_fixed ?? 100);
+            } else if (feeMethod === 'percent') {
+                feeNgn = Math.round(((rechargeAmount * Number(this.pricingSettings.utility_electricity_fee_percent ?? 0)) / 100) * 100) / 100;
+            }
+            const totalCustomerCharge = rechargeAmount + feeNgn;
+
             this.confirmDataModal = {
                 title: 'Confirm Electricity Payment',
                 service: 'Electricity Recharge',
@@ -1471,7 +1518,11 @@ function utilitiesApp() {
                 product: 'Meter (' + this.electricity.meterType.toUpperCase() + ')',
                 target: this.electricity.meterNumber,
                 customerName: this.electricity.customerName || 'Verified Customer',
-                amountNgn: this.electricity.amount,
+                faceValueNgn: rechargeAmount,
+                feeNgn: feeNgn,
+                feeLabel: 'Convenience Fee:',
+                discountNgn: 0,
+                amountNgn: totalCustomerCharge,
                 actionType: 'electricity',
             };
             this.modalOpen = true;
@@ -1499,6 +1550,16 @@ function utilitiesApp() {
                 }
             }
 
+            const depositAmount = Number(this.betting.amount);
+            const feeMethod = this.pricingSettings.utility_betting_fee_method || 'percent';
+            let feeNgn = 0;
+            if (feeMethod === 'percent') {
+                feeNgn = Math.round(((depositAmount * Number(this.pricingSettings.utility_betting_fee_percent ?? 1.5)) / 100) * 100) / 100;
+            } else if (feeMethod === 'fixed') {
+                feeNgn = Number(this.pricingSettings.utility_betting_fee_fixed ?? 0);
+            }
+            const totalCustomerCharge = depositAmount + feeNgn;
+
             this.confirmDataModal = {
                 title: 'Confirm Betting Wallet Top-Up',
                 service: 'Gaming Wallet Funding',
@@ -1506,7 +1567,11 @@ function utilitiesApp() {
                 product: 'Wallet Deposit',
                 target: this.betting.customerId,
                 customerName: this.betting.customerName || 'Verified Bettor',
-                amountNgn: this.betting.amount,
+                faceValueNgn: depositAmount,
+                feeNgn: feeNgn,
+                feeLabel: 'Processing Fee (' + (feeMethod === 'percent' ? (this.pricingSettings.utility_betting_fee_percent ?? '1.5') + '%' : 'Fixed') + '):',
+                discountNgn: 0,
+                amountNgn: totalCustomerCharge,
                 actionType: 'betting',
             };
             this.modalOpen = true;

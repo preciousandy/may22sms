@@ -201,6 +201,15 @@
                         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 00-14 0v4a3 3 0 003 3h1a1 1 0 001-1v-4a1 1 0 00-1-1H7a5 5 0 0110 0h-2a1 1 0 00-1 1v4a1 1 0 001 1h1a3 3 0 003-3v-4z"/></svg>
                         <span>Support Desk</span>
                     </a>
+                    <a href="https://wa.me/16573369673?text=Hello%20May22SMS%20Support%2C%20I%20need%20assistance." target="_blank" rel="noopener noreferrer" class="flex items-center justify-between py-2.5 px-3.5 rounded-xl font-bold text-sm transition-all text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100 border border-emerald-200/70">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-5 h-5 shrink-0 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.54 1.771.82 2.788.82 3.185 0 5.772-2.587 5.773-5.767.001-3.182-2.585-5.805-5.77-5.805zm3.376 8.21c-.14.394-.712.729-1.02.775-.297.045-.67.073-2.138-.535-1.748-.724-2.859-2.5-2.946-2.617-.087-.116-.708-.941-.708-1.794 0-.853.447-1.272.607-1.447.16-.175.349-.219.465-.219.117 0 .233.001.335.006.107.005.251-.041.393.3.146.35.496 1.21.54 1.297.044.088.073.19.015.306-.059.117-.088.19-.175.292-.087.102-.185.228-.264.306-.088.087-.179.182-.077.357.102.175.454.748.974 1.211.67.597 1.235.782 1.41.87.175.088.277.073.38-.044.102-.117.437-.51.554-.685.117-.175.234-.146.394-.088.16.059 1.02.481 1.195.568.175.088.291.131.335.204.044.073.044.423-.096.817z"/>
+                            </svg>
+                            <span>WhatsApp Chat</span>
+                        </div>
+                        <span class="text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-white px-1.5 py-0.5 rounded-md">LIVE</span>
+                    </a>
                     <a href="/notifications" class="flex items-center gap-3 py-2.5 px-3.5 rounded-xl font-bold text-sm transition-all {{ request()->is('notifications') ? 'bg-[#0d9488] text-white shadow-md' : 'text-slate-700 hover:bg-teal-50 hover:text-[#0d9488]' }}">
                         <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                         <span>Notifications</span>
@@ -395,6 +404,20 @@
                 <span class="text-[10px] font-black mt-1 {{ request()->is('profile') ? 'text-[#0d9488]' : 'text-slate-600' }}">Me</span>
             </a>
         </nav>
+
+        <!-- Side-Docked WhatsApp Direct Support Tab -->
+        <a href="https://wa.me/16573369673?text=Hello%20May22SMS%20Support%2C%20I%20need%20assistance."
+           target="_blank"
+           rel="noopener noreferrer"
+           aria-label="Chat on WhatsApp Support"
+           title="Chat with Support on WhatsApp"
+           style="position: fixed; right: 0; top: 50%; transform: translateY(-50%); z-index: 40; border-top-left-radius: 14px; border-bottom-left-radius: 14px;"
+           class="inline-flex flex-col items-center gap-1 px-2.5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[10px] shadow-lg border border-r-0 border-emerald-400/50 transition active:scale-95">
+            <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.669-.699c.969.54 1.771.82 2.788.82 3.185 0 5.772-2.587 5.773-5.767.001-3.182-2.585-5.805-5.77-5.805zm3.376 8.21c-.14.394-.712.729-1.02.775-.297.045-.67.073-2.138-.535-1.748-.724-2.859-2.5-2.946-2.617-.087-.116-.708-.941-.708-1.794 0-.853.447-1.272.607-1.447.16-.175.349-.219.465-.219.117 0 .233.001.335.006.107.005.251-.041.393.3.146.35.496 1.21.54 1.297.044.088.073.19.015.306-.059.117-.088.19-.175.292-.087.102-.185.228-.264.306-.088.087-.179.182-.077.357.102.175.454.748.974 1.211.67.597 1.235.782 1.41.87.175.088.277.073.38-.044.102-.117.437-.51.554-.685.117-.175.234-.146.394-.088.16.059 1.02.481 1.195.568.175.088.291.131.335.204.044.073.044.423-.096.817z"/>
+            </svg>
+            <span style="writing-mode: vertical-rl; text-orientation: mixed; letter-spacing: 0.04em;">Support</span>
+        </a>
         
     </div>
 </div>

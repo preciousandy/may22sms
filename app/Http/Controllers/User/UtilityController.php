@@ -46,7 +46,8 @@ class UtilityController extends Controller
         $supportedDiscos = $this->bigiSubService->getSupportedDiscos();
         $supportedBetting = $this->bigiSubService->getSupportedBettingPlatforms();
 
-        $airtimeDiscount = (float) (Setting::where('key', 'utility_airtime_discount_percent')->value('value') ?? 2.0);
+        $pricingSettings = $this->utilityService->getPricingService()->getAllSettings();
+        $airtimeDiscount = (float) ($pricingSettings['utility_airtime_discount_percent'] ?? 0.0);
         $serviceStatuses = app(\App\Services\ServiceManager::class)->getAllStatuses();
 
         return view('user.utilities.index', compact(
@@ -62,8 +63,51 @@ class UtilityController extends Controller
             'supportedDiscos',
             'supportedBetting',
             'airtimeDiscount',
+            'pricingSettings',
             'serviceStatuses'
         ));
+    }
+
+    /**
+     * AJAX: Get real-time authoritative pricing quote with fee disclosure.
+     */
+    public function quote(Request $request): JsonResponse
+    {
+        $service = strtolower((string) $request->query('service', 'airtime'));
+        $pricing = $this->utilityService->getPricingService();
+
+        try {
+            $quote = match ($service) {
+                'airtime' => $pricing->calculateAirtimePricing(
+                    (float) $request->query('amount', 0),
+                    (string) $request->query('network', '')
+                ),
+                'data' => (function() use ($request, $pricing) {
+                    $network = (string) $request->query('network', 'mtn');
+                    $planId = $request->query('plan_id');
+                    $rawPlans = $this->bigiSubService->getRawDataPlans($network);
+                    $selected = collect($rawPlans)->first(fn($p) => (string)$p['id'] === (string)$planId);
+                    if (!$selected) {
+                        throw new \InvalidArgumentException('Selected data plan is not available.');
+                    }
+                    $rawPrice = (float) ($selected['plan_amount'] ?? ($selected['price_ngn'] ?? ($selected['price'] ?? 0)));
+                    return $pricing->calculateDataPricing($rawPrice, $network);
+                })(),
+                'electricity' => $pricing->calculateElectricityPricing((float) $request->query('amount', 0)),
+                'betting' => $pricing->calculateBettingPricing((float) $request->query('amount', 0)),
+                default => throw new \InvalidArgumentException('Invalid service specified.'),
+            };
+
+            return response()->json([
+                'success' => true,
+                'quote' => $quote,
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        }
     }
 
     /**
