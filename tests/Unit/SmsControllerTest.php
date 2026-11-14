@@ -37,6 +37,8 @@ class SmsControllerTest extends TestCase
         $fiveSimMock = $this->createMock(FiveSimService::class);
         $daisySmsMock = $this->createMock(DaisySmsService::class);
         $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+        $heroSmsMock->method('resolveServiceName')->willReturnArgument(0);
+        $heroSmsMock->method('resolveServiceCode')->willReturnArgument(0);
         $daisySmsMock->expects($this->once())->method('cancelOrder')->with('12345')->willReturn(['success' => true]);
 
         $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
@@ -73,6 +75,8 @@ class SmsControllerTest extends TestCase
         $fiveSimMock = $this->createMock(FiveSimService::class);
         $daisySmsMock = $this->createMock(DaisySmsService::class);
         $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+        $heroSmsMock->method('resolveServiceName')->willReturnArgument(0);
+        $heroSmsMock->method('resolveServiceCode')->willReturnArgument(0);
 
         $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
 
@@ -95,6 +99,8 @@ class SmsControllerTest extends TestCase
         $fiveSimMock = $this->createMock(FiveSimService::class);
         $daisySmsMock = $this->createMock(DaisySmsService::class);
         $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+        $heroSmsMock->method('resolveServiceName')->willReturnArgument(0);
+        $heroSmsMock->method('resolveServiceCode')->willReturnArgument(0);
 
         $heroSmsMock->expects($this->once())
             ->method('getPrices')
@@ -129,6 +135,8 @@ class SmsControllerTest extends TestCase
         $fiveSimMock = $this->createMock(FiveSimService::class);
         $daisySmsMock = $this->createMock(DaisySmsService::class);
         $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+        $heroSmsMock->method('resolveServiceName')->willReturnArgument(0);
+        $heroSmsMock->method('resolveServiceCode')->willReturnArgument(0);
 
         $heroSmsMock->expects($this->once())
             ->method('getPrices')
@@ -167,5 +175,55 @@ class SmsControllerTest extends TestCase
         $this->assertEquals(3.00, $tiers[2]['max_price']);
         $this->assertGreaterThan($tiers[0]['cost'], $tiers[1]['cost']);
         $this->assertGreaterThan($tiers[1]['cost'], $tiers[2]['cost']);
+    }
+
+    public function test_get_price_tiers_generates_all_five_tiers_for_services_without_live_map()
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $fiveSimMock = $this->createMock(FiveSimService::class);
+        $daisySmsMock = $this->createMock(DaisySmsService::class);
+        $heroSmsMock = $this->createMock(\App\Services\HeroSmsService::class);
+        $heroSmsMock->method('resolveServiceName')->willReturnArgument(0);
+        $heroSmsMock->method('resolveServiceCode')->willReturnArgument(0);
+
+        $heroSmsMock->expects($this->once())
+            ->method('getPrices')
+            ->with('usa')
+            ->willReturn([
+                'usa' => [
+                    'google' => [
+                        'any' => ['cost' => 0.50, 'count' => 500],
+                    ],
+                ],
+            ]);
+
+        // Simulates HeroSMS having no freePriceMap or rate limiting for Google
+        $heroSmsMock->expects($this->once())
+            ->method('getPriceTiers')
+            ->with('usa', 'google')
+            ->willReturn([]);
+
+        $controller = new SmsController($fiveSimMock, $daisySmsMock, $heroSmsMock);
+        $request = Request::create('/api/sms/price-tiers', 'GET', [
+            'provider' => 'herosms',
+            'country' => 'usa',
+            'service' => 'google',
+        ]);
+
+        $response = $controller->getPriceTiers($request);
+        $tiers = $response->getData(true);
+
+        $this->assertCount(5, $tiers);
+        $this->assertEquals('Standard', $tiers[0]['label']);
+        $this->assertEquals('Fast Priority (Default)', $tiers[1]['label']);
+        $this->assertEquals('High Priority', $tiers[2]['label']);
+        $this->assertEquals('Express Priority', $tiers[3]['label']);
+        $this->assertEquals('Instant / Max Priority', $tiers[4]['label']);
+        $this->assertGreaterThan($tiers[0]['cost'], $tiers[1]['cost']);
+        $this->assertGreaterThan($tiers[1]['cost'], $tiers[2]['cost']);
+        $this->assertGreaterThan($tiers[2]['cost'], $tiers[3]['cost']);
+        $this->assertGreaterThan($tiers[3]['cost'], $tiers[4]['cost']);
     }
 }

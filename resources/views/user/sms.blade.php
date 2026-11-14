@@ -801,9 +801,7 @@
         try {
             const servicesPromise = fetch(`/api/sms/services?provider=${provider}&country=${country}`).then(r => r.json());
             const prefetchService = selectedServiceKey || 'whatsapp';
-            if (provider === 'herosms') {
-                fetchPriceTiersData(provider, country, prefetchService);
-            }
+            fetchPriceTiersData(provider, country, prefetchService);
             const data = await servicesPromise;
             currentServicesData = data;
             serviceLoadingIndicator.textContent = 'Live pricing loaded';
@@ -979,23 +977,60 @@
         applySelectedPricing();
     }
 
+    function buildInstantFallbackTiers(baseCostUsd, serviceKey) {
+        const baseUserCost = round2(parseFloat(baseCostUsd || 0));
+        const ngnRate = currencyFx > 1 ? currencyFx : 1500;
+        const serviceData = currentServicesData ? currentServicesData[serviceKey] : null;
+        const firstKey = serviceData ? Object.keys(serviceData)[0] : null;
+        const firstDetails = serviceData ? (serviceData['any'] || (firstKey ? serviceData[firstKey] : null)) : null;
+        const baseCount = firstDetails && firstDetails.count ? parseInt(firstDetails.count, 10) : 0;
+
+        const tiers = [
+            {
+                id: 'standard',
+                label: 'Standard',
+                max_price: null,
+                cost: baseUserCost,
+                count: baseCount,
+            }
+        ];
+
+        const defs = [
+            { label: 'Fast Priority (Default)', mult: 1.25, stepNgn: 350 },
+            { label: 'High Priority',          mult: 1.50, stepNgn: 750 },
+            { label: 'Express Priority',       mult: 2.00, stepNgn: 1500 },
+            { label: 'Instant / Max Priority', mult: 2.75, stepNgn: 2600 },
+        ];
+
+        let prevCost = baseUserCost;
+        defs.forEach(d => {
+            const multCost = round2(baseUserCost * d.mult);
+            const minReq = round2(baseUserCost + round2(d.stepNgn / ngnRate));
+            let userCost = Math.max(multCost, minReq);
+            if (userCost <= prevCost) {
+                userCost = round2(prevCost + round2(200 / ngnRate));
+            }
+            tiers.push({
+                id: String(userCost),
+                label: d.label,
+                max_price: round2(baseUserCost * d.mult),
+                cost: userCost,
+                count: baseCount > 0 ? Math.round(baseCount * (1 / d.mult)) : 0,
+            });
+            prevCost = userCost;
+        });
+
+        return tiers;
+    }
+
     async function loadPriceTiers(serviceKey) {
         const provider = getSelectedProvider();
         if (!priceTierSelect || !priceTierContainer) return;
 
-        if (provider !== 'herosms') {
-            if (priceTierSection) priceTierSection.classList.add('hidden');
-            if (priceTierLoading) priceTierLoading.classList.add('hidden');
-            priceTierContainer.classList.add('hidden');
-            priceTierSelect.innerHTML = '<option value="">Standard (Default)</option>';
-            selectedMaxPrice = null;
-            return;
-        }
-
         if (priceTierSection) priceTierSection.classList.remove('hidden');
         priceTierContainer.classList.remove('hidden');
         const token = ++priceTierRequestToken;
-        const country = countrySelect.value || 'usa';
+        const country = (provider === 'daisysms') ? 'usa' : (countrySelect.value || 'usa');
         const cacheKey = `${provider}:${country}:${serviceKey}`;
 
         // Use cached tiers immediately if already resolved
@@ -1005,16 +1040,18 @@
             return;
         }
 
-        // Default option while loading
-        const baseEffective = calculateEffectivePrice(selectedBasePrice, serviceKey);
-        priceTierSelect.innerHTML = `<option value="" data-base-price="${selectedBasePrice}" data-price="${baseEffective}">Standard — ${currencySymbol}${(baseEffective * currencyFx).toFixed(2)}</option>`;
-        selectedMaxPrice = null;
+        // Immediately populate all 5 Speed / Price Tiers from the service base price
+        // so that EVERY service and country shows the options right away with zero delay
+        const instantTiers = buildInstantFallbackTiers(selectedBasePrice, serviceKey);
+        populatePriceTierSelect(instantTiers, serviceKey);
         if (priceTierLoading) priceTierLoading.classList.remove('hidden');
 
         try {
             const tiers = await fetchPriceTiersData(provider, country, serviceKey);
             if (token !== priceTierRequestToken) return;
-            populatePriceTierSelect(tiers, serviceKey);
+            if (Array.isArray(tiers) && tiers.length > 1) {
+                populatePriceTierSelect(tiers, serviceKey);
+            }
         } finally {
             if (token === priceTierRequestToken && priceTierLoading) {
                 priceTierLoading.classList.add('hidden');

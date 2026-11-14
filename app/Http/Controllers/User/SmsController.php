@@ -208,26 +208,59 @@ class SmsController extends Controller
     public function getPriceTiers(Request $request)
     {
         $smsProvider = $this->resolveSmsProvider(null, $request->input('provider'));
-        if ($smsProvider !== 'herosms') {
-            return response()->json([]);
-        }
-
         $country = strtolower((string) $request->input('country', 'usa'));
+        if ($smsProvider === 'daisysms') {
+            $country = 'usa';
+        }
         $service = strtolower(trim((string) $request->input('service', '')));
         if ($service === '') {
             return response()->json([]);
         }
 
-        $prices = $this->heroSms->getPrices($country);
-        $baseEntry = $prices[$country][$service]['any'] ?? null;
+        $serviceName = $this->heroSms->resolveServiceName($service);
+        if (empty($serviceName)) {
+            $serviceName = $service;
+        }
+        $serviceCode = $this->heroSms->resolveServiceCode($service);
+        if (empty($serviceCode)) {
+            $serviceCode = $service;
+        }
+
+        $smsService = $this->resolveSmsService(null, $smsProvider);
+        $prices = $smsService->getPrices($country);
+        $serviceEntries = $prices[$country][$serviceName]
+            ?? $prices[$country][$serviceCode]
+            ?? $prices[$country][$service]
+            ?? null;
+
+        $baseEntry = null;
+        if (is_array($serviceEntries)) {
+            if (isset($serviceEntries['any']) && is_array($serviceEntries['any'])) {
+                $baseEntry = $serviceEntries['any'];
+            } else {
+                foreach ($serviceEntries as $opEntry) {
+                    if (is_array($opEntry) && isset($opEntry['cost'])) {
+                        $baseEntry = $opEntry;
+                        break;
+                    }
+                }
+            }
+        }
+
         if (!is_array($baseEntry) || !isset($baseEntry['cost'])) {
             return response()->json([]);
         }
 
-        $markupPercent = $this->resolveSmsMarkupPercent($country, $service);
+        $markupPercent = $this->resolveSmsMarkupPercent($country, $serviceName);
         $multiplier = 1 + ($markupPercent / 100);
         $baseProviderCost = (float) $baseEntry['cost'];
-        $baseUserCost = $this->applyMinPriceFloor(round($baseProviderCost * $multiplier, 2), $country, $service);
+        $baseUserCost = $this->applyMinPriceFloor(round($baseProviderCost * $multiplier, 2), $country, $serviceName);
+        $baseCount = (int) ($baseEntry['count'] ?? 0);
+
+        $ngnPerUsd = (float) (Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500);
+        if ($ngnPerUsd <= 0) {
+            $ngnPerUsd = 1500.0;
+        }
 
         $tiers = [
             [
@@ -236,32 +269,75 @@ class SmsController extends Controller
                 'max_price' => null,
                 'provider_cost' => $baseProviderCost,
                 'cost' => $baseUserCost,
-                'count' => (int) ($baseEntry['count'] ?? 0),
+                'count' => $baseCount,
             ],
         ];
 
-        $rawTiers = $this->heroSms->getPriceTiers($country, $service);
+        // 1. Try fetching real freePriceMap tiers from HeroSMS
+        $rawTiers = [];
+        if ($smsProvider === 'herosms') {
+            try {
+                $rawTiers = $this->heroSms->getPriceTiers($country, $serviceName);
+            } catch (\Throwable $e) {
+                $rawTiers = [];
+            }
+        }
+
         $higherCandidates = [];
         $lastUserCost = $baseUserCost;
 
-        foreach ($rawTiers as $tier) {
-            $p = (float) ($tier['price'] ?? 0);
-            if ($p <= $baseProviderCost) {
-                continue;
+        if (!empty($rawTiers)) {
+            foreach ($rawTiers as $tier) {
+                $p = (float) ($tier['price'] ?? 0);
+                if ($p <= $baseProviderCost) {
+                    continue;
+                }
+                $userCost = $this->applyMinPriceFloor(round($p * $multiplier, 2), $country, $serviceName);
+                if ($userCost <= $lastUserCost) {
+                    continue;
+                }
+                $higherCandidates[] = [
+                    'provider_cost' => $p,
+                    'cost' => $userCost,
+                    'count' => (int) ($tier['count'] ?? 0),
+                ];
+                $lastUserCost = $userCost;
             }
-            $userCost = $this->applyMinPriceFloor(round($p * $multiplier, 2), $country, $service);
-            if ($userCost <= $lastUserCost) {
-                continue;
-            }
-            $higherCandidates[] = [
-                'provider_cost' => $p,
-                'cost' => $userCost,
-                'count' => (int) ($tier['count'] ?? 0),
-            ];
-            $lastUserCost = $userCost;
         }
 
-        if (!empty($higherCandidates)) {
+        // 2. If live freePriceMap gave fewer than 2 higher tiers (or rate limited / unavailable for this service),
+        // generate guaranteed priority tiers so that ALL services have the speed / price options!
+        if (count($higherCandidates) < 2) {
+            $multipliers = [
+                ['label' => 'Fast Priority (Default)', 'mult' => 1.25, 'step_ngn' => 350.0],
+                ['label' => 'High Priority',          'mult' => 1.50, 'step_ngn' => 750.0],
+                ['label' => 'Express Priority',       'mult' => 2.00, 'step_ngn' => 1500.0],
+                ['label' => 'Instant / Max Priority', 'mult' => 2.75, 'step_ngn' => 2600.0],
+            ];
+
+            $prevCost = $baseUserCost;
+            foreach ($multipliers as $mDef) {
+                $pCost = round($baseProviderCost * $mDef['mult'], 4);
+                $calcUserCost = $this->applyMinPriceFloor(round($pCost * $multiplier, 2), $country, $serviceName);
+                $stepUsd = round($mDef['step_ngn'] / $ngnPerUsd, 2);
+                $minRequired = round($baseUserCost + $stepUsd, 2);
+                $userCost = max($calcUserCost, $minRequired);
+                if ($userCost <= $prevCost) {
+                    $userCost = round($prevCost + round(200.0 / $ngnPerUsd, 2), 2);
+                }
+
+                $tiers[] = [
+                    'id' => (string) $pCost,
+                    'label' => $mDef['label'],
+                    'max_price' => $pCost,
+                    'provider_cost' => $pCost,
+                    'cost' => $userCost,
+                    'count' => $baseCount > 0 ? (int) round($baseCount * (1.0 / $mDef['mult'])) : 0,
+                ];
+                $prevCost = $userCost;
+            }
+        } else {
+            // Pick from live freePriceMap
             $picked = [];
             $total = count($higherCandidates);
             if ($total <= 4) {
@@ -333,7 +409,7 @@ class SmsController extends Controller
             }
         $product = (string) $request->product;
         $operator = (string) $request->operator;
-        $maxPrice = ($smsProvider === 'herosms' && $request->filled('max_price') && (float) $request->input('max_price') > 0)
+        $maxPrice = ($request->filled('max_price') && (float) $request->input('max_price') > 0)
             ? (float) $request->input('max_price')
             : null;
 
@@ -357,6 +433,9 @@ class SmsController extends Controller
                     $estimated = round($estimated * (1 + ($premiumPercent / 100)), 2);
                 }
                 $price = $this->applyMinPriceFloor($estimated, $country, $product);
+            }
+            if ($maxPrice !== null && (float) $request->price > (float) $price) {
+                $price = $this->applyMinPriceFloor(round((float) $request->price, 2), $country, $product);
             }
         } catch (\Throwable $e) {
         }
@@ -389,6 +468,9 @@ class SmsController extends Controller
                 $finalPrice = round($finalPrice * (1 + ($premiumPercent / 100)), 2);
             }
             $finalPrice = $this->applyMinPriceFloor($finalPrice, $country, $product);
+            if ($maxPrice !== null && (float) $price > (float) $finalPrice) {
+                $finalPrice = (float) $price;
+            }
             $discount = $promo ? app(PromoService::class)->calculateDiscountUsd($promo, (float) $finalPrice) : 0.0;
             $netPrice = round((float) $finalPrice - (float) $discount, 2);
 
