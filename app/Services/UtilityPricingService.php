@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Setting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use InvalidArgumentException;
 
 class UtilityPricingService
@@ -110,18 +111,20 @@ class UtilityPricingService
                 elseif (str_contains($key, 'electricity')) $service = 'electricity';
                 elseif (str_contains($key, 'betting')) $service = 'betting';
 
-                DB::table('utility_pricing_audit_logs')->insert([
-                    'admin_id' => $adminId,
-                    'admin_name' => $adminName,
-                    'admin_email' => $adminEmail,
-                    'service_type' => $service,
-                    'setting_key' => $key,
-                    'previous_value' => $prevVal,
-                    'new_value' => $newVal,
-                    'ip_address' => $ip,
-                    'user_agent' => $userAgent,
-                    'created_at' => now(),
-                ]);
+                if (Schema::hasTable('utility_pricing_audit_logs')) {
+                    DB::table('utility_pricing_audit_logs')->insert([
+                        'admin_id' => $adminId,
+                        'admin_name' => $adminName,
+                        'admin_email' => $adminEmail,
+                        'service_type' => $service,
+                        'setting_key' => $key,
+                        'previous_value' => $prevVal,
+                        'new_value' => $newVal,
+                        'ip_address' => $ip,
+                        'user_agent' => $userAgent,
+                        'created_at' => now(),
+                    ]);
+                }
 
                 $updated[$key] = ['old' => $prevVal, 'new' => $newVal];
             }

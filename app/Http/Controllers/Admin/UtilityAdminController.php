@@ -8,6 +8,8 @@ use App\Models\UtilityTransaction;
 use App\Services\BigiSubService;
 use App\Services\UtilityService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class UtilityAdminController extends Controller
@@ -115,7 +117,9 @@ class UtilityAdminController extends Controller
         $simulate = (int) (Setting::where('key', 'bigisub_simulate')->value('value') ?? (config('services.bigisub.simulate') ? 1 : 0)) === 1;
 
         $providerBalance = $this->bigiSubService->getBalance();
-        $auditLogs = DB::table('utility_pricing_audit_logs')->latest('created_at')->take(10)->get();
+        $auditLogs = Schema::hasTable('utility_pricing_audit_logs')
+            ? DB::table('utility_pricing_audit_logs')->latest('created_at')->take(10)->get()
+            : collect();
 
         return view('admin.utilities.index', compact(
             'transactions',
