@@ -100,7 +100,7 @@
         <div class="text-gray-400 flex items-center gap-2">
             <span>Order #{{ $activeOrder->id }}</span>
             <span>•</span>
-            <span>Charge: <strong class="text-white">{{ $currencySymbol ?? '$' }}{{ number_format($activeOrder->price, 2) }}</strong></span>
+            <span>Charge: <strong class="text-white">{{ $currencySymbol ?? '$' }}{{ isset($formatAmount) ? $formatAmount($activeOrder->price) : number_format(((float) $activeOrder->price) * ((float) ($currencyFx ?? 1)), 2) }}</strong></span>
             <span>•</span>
             <span class="text-teal-300">Auto-refunded if no SMS arrives within 20 mins</span>
         </div>
@@ -149,7 +149,7 @@
             <!-- Wallet Balance Badge with Quick Top-Up -->
             <div class="flex items-center gap-2 bg-gray-100/80 hover:bg-gray-100 border border-gray-200/60 px-3.5 py-1.5 rounded-2xl transition">
                 <span class="text-xs text-gray-500 font-medium">Wallet:</span>
-                <span class="text-sm font-black text-gray-900">{{ $currencySymbol ?? '$' }}{{ number_format($walletBal, 2) }}</span>
+                <span class="text-sm font-black text-gray-900">{{ $currencySymbol ?? '$' }}{{ isset($formatAmount) ? $formatAmount($walletBal) : number_format(((float) $walletBal) * ((float) ($currencyFx ?? 1)), 2) }}</span>
                 <a href="{{ url('/funding') }}" class="text-xs font-extrabold text-[#0d9488] hover:text-teal-700 ml-1 flex items-center gap-0.5" title="Add funds to wallet">
                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"></path></svg>
                     Top up
@@ -531,7 +531,7 @@
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap font-bold text-gray-900">
-                                {{ $currencySymbol ?? '$' }}{{ number_format($order->price, 2) }}
+                                {{ $currencySymbol ?? '$' }}{{ isset($formatAmount) ? $formatAmount($order->price) : number_format(((float) $order->price) * ((float) ($currencyFx ?? 1)), 2) }}
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 @if($isPending)
