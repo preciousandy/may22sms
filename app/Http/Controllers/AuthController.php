@@ -198,6 +198,51 @@ class AuthController extends Controller
     }
 
     /**
+     * Generate a signed, stateless HMAC state token for Google OAuth (valid for 15 minutes).
+     */
+    private function generateGoogleOAuthState(?string $ref = null): string
+    {
+        $payload = json_encode([
+            'ts' => time(),
+            'nonce' => Str::random(16),
+            'ref' => $ref ? strtoupper(trim($ref)) : '',
+        ]);
+        $b64 = rtrim(strtr(base64_encode((string) $payload), '+/', '-_'), '=');
+        $sig = hash_hmac('sha256', $b64, (string) config('app.key'));
+
+        return $b64 . '.' . $sig;
+    }
+
+    /**
+     * Verify a signed Google OAuth state token and return decoded payload or null.
+     */
+    private function verifyGoogleOAuthState(string $state): ?array
+    {
+        if (! str_contains($state, '.')) {
+            return null;
+        }
+        [$b64, $sig] = explode('.', $state, 2);
+        $expectedSig = hash_hmac('sha256', $b64, (string) config('app.key'));
+        if (! hash_equals($expectedSig, $sig)) {
+            return null;
+        }
+        $json = base64_decode(strtr($b64, '-_', '+/'), true);
+        if ($json === false) {
+            return null;
+        }
+        $data = json_decode($json, true);
+        if (! is_array($data) || ! isset($data['ts'])) {
+            return null;
+        }
+        // Valid for 15 minutes
+        if (abs(time() - (int) $data['ts']) > 900) {
+            return null;
+        }
+
+        return $data;
+    }
+
+    /**
      * Redirect the user to Google's OAuth 2.0 consent page.
      */
     public function redirectToGoogle(Request $request)
@@ -209,14 +254,16 @@ class AuthController extends Controller
             ]);
         }
 
-        if ($request->filled('ref')) {
-            $request->session()->put('oauth_referral_code', strtoupper(trim((string) $request->query('ref'))));
+        $ref = $request->filled('ref') ? strtoupper(trim((string) $request->query('ref'))) : null;
+        if ($ref) {
+            $request->session()->put('oauth_referral_code', $ref);
         }
 
-        $state = Str::random(40);
+        $state = $this->generateGoogleOAuthState($ref);
         $request->session()->put('google_oauth_state', $state);
+        $request->session()->save();
 
-        $redirectUri = trim((string) config('services.google.redirect')) ?: url('/auth/google/callback');
+        $redirectUri = trim((string) config('services.google.redirect')) ?: $request->getSchemeAndHttpHost() . '/auth/google/callback';
 
         $query = http_build_query([
             'client_id' => $clientId,
@@ -244,7 +291,10 @@ class AuthController extends Controller
 
         $expectedState = (string) $request->session()->pull('google_oauth_state', '');
         $incomingState = (string) $request->query('state', '');
-        if ($expectedState === '' || ! hash_equals($expectedState, $incomingState)) {
+        $verifiedState = $this->verifyGoogleOAuthState($incomingState);
+        $sessionMatches = ($expectedState !== '' && hash_equals($expectedState, $incomingState));
+
+        if (! $verifiedState && ! $sessionMatches) {
             return redirect('/login')->withErrors([
                 'email' => 'Invalid Google Sign-In state. Please try again.',
             ]);
@@ -259,7 +309,7 @@ class AuthController extends Controller
 
         $clientId = trim((string) config('services.google.client_id'));
         $clientSecret = trim((string) config('services.google.client_secret'));
-        $redirectUri = trim((string) config('services.google.redirect')) ?: url('/auth/google/callback');
+        $redirectUri = trim((string) config('services.google.redirect')) ?: $request->getSchemeAndHttpHost() . '/auth/google/callback';
 
         try {
             $tokenResponse = Http::asForm()->timeout(15)->post('https://oauth2.googleapis.com/token', [
@@ -345,7 +395,7 @@ class AuthController extends Controller
             } else {
                 $isNewUser = true;
                 $referrerId = null;
-                $ref = strtoupper(trim((string) $request->session()->pull('oauth_referral_code', '')));
+                $ref = strtoupper(trim((string) ($request->session()->pull('oauth_referral_code', '') ?: ($verifiedState['ref'] ?? ''))));
                 if ($ref !== '') {
                     $referrerId = User::where('referral_code', $ref)->value('id');
                 }
