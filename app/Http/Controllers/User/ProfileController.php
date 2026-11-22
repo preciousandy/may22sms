@@ -34,6 +34,10 @@ class ProfileController extends Controller
 
         $user->save();
 
+        if (! empty($user->phone_number)) {
+            $request->session()->forget('google_phone_setup_guide');
+        }
+
         return back()->with('success', 'Profile updated successfully.');
     }
 }

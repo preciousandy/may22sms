@@ -51,6 +51,10 @@ Route::middleware('guest')->group(function () {
     Route::get('/register', [AuthController::class, 'showRegister'])->name('register');
     Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:3,60'); // Max 3 registrations per hour
 
+    // Google OAuth 2.0 Sign In / Sign Up
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle'])->name('auth.google');
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
+
     Route::get('/two-factor', [TwoFactorController::class, 'show']);
     Route::post('/two-factor', [TwoFactorController::class, 'verify']);
     Route::post('/two-factor/resend', [TwoFactorController::class, 'resend']);

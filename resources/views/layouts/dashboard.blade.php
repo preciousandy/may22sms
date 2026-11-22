@@ -363,6 +363,30 @@
                     </div>
                 @endif
 
+                <!-- Missing Phone Number Guide Banner (For Google Sign-Up Users) -->
+                @if(auth()->check() && empty(trim((string) (auth()->user()->phone_number ?? ''))) && !request()->is('profile'))
+                    <div class="rounded-2xl border-2 border-teal-500/40 bg-gradient-to-r from-teal-50 via-emerald-50/70 to-amber-50/50 p-4 text-slate-900 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-sm">
+                        <div class="flex items-start sm:items-center gap-3">
+                            <div class="w-9 h-9 rounded-xl bg-[#0d9488] text-white flex items-center justify-center shrink-0 font-black text-sm shadow-xs">
+                                📱
+                            </div>
+                            <div>
+                                <div class="text-xs sm:text-sm font-black text-slate-900 flex items-center gap-2">
+                                    <span>Complete Your Google Profile Setup</span>
+                                    <span class="bg-amber-400 text-amber-950 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">1 Step Left</span>
+                                </div>
+                                <p class="text-xs text-slate-600 mt-0.5">
+                                    Add your phone number on your Profile page so virtual bank accounts, wallet funding, and order alerts work smoothly.
+                                </p>
+                            </div>
+                        </div>
+                        <a href="/profile#phone_number_input" class="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0d9488] hover:bg-teal-700 px-4 py-2.5 text-xs font-black text-white shadow-sm transition shrink-0">
+                            <span>Update Phone Number</span>
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"/></svg>
+                        </a>
+                    </div>
+                @endif
+
                 @yield('dashboard_content')
             </div>
         </main>

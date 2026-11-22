@@ -45,6 +45,8 @@ class User extends Authenticatable
         'monietude_account_name',
         'monietude_bank_name',
         'monietude_provider',
+        'google_id',
+        'email_verified_at',
     ];
 
     /**
