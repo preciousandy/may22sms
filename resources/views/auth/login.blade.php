@@ -206,7 +206,7 @@
     <div class="auth-glow-2"></div>
 
     <!-- Top Brand Link -->
-    <div class="relative z-10 text-center mb-8">
+    <div class="relative z-10 text-center mb-8 flex items-center justify-center gap-4">
         <a href="/" class="inline-flex items-center gap-3 text-decoration-none group">
             <div class="h-12 w-12 rounded-2xl bg-white shadow-md shadow-teal-500/15 flex items-center justify-center border border-teal-500/20 group-hover:scale-105 transition-transform">
                 <img src="{{ asset('logo/favicon-512.png') }}" alt="{{ $siteName ?? 'May22SMS' }}" class="h-8 w-8 object-contain">
@@ -218,6 +218,16 @@
                 <span class="text-xs font-semibold text-slate-400">Automated Digital Hub</span>
             </div>
         </a>
+        <button
+            type="button"
+            x-data="{ dark: document.documentElement.classList.contains('dark') }"
+            @may22-theme-changed.window="dark = ($event.detail.theme === 'dark')"
+            @click="dark = (window.toggleSiteTheme() === 'dark')"
+            class="w-10 h-10 rounded-2xl bg-white border border-slate-200 text-slate-700 flex items-center justify-center shadow-xs hover:border-teal-500 transition cursor-pointer"
+            :title="dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+            aria-label="Toggle Dark or Light Mode">
+            <i class="fas text-sm" :class="dark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
+        </button>
     </div>
 
     <!-- Central Modern Auth Card -->

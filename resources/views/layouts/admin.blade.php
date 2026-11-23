@@ -399,7 +399,24 @@ x-init="
                 <h2 class="text-lg sm:text-xl font-black text-gray-900 truncate">@stack('header_title', 'Admin Portal')</h2>
             </div>
 
-            <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-3 sm:space-x-4">
+                <!-- Dark / Light Mode Toggle Button -->
+                <button
+                    type="button"
+                    x-data="{ dark: document.documentElement.classList.contains('dark') }"
+                    @may22-theme-changed.window="dark = ($event.detail.theme === 'dark')"
+                    @click="dark = (window.toggleSiteTheme() === 'dark')"
+                    class="w-9 h-9 rounded-xl bg-gray-100 hover:bg-teal-50 hover:text-[#0d9488] border border-gray-200 text-gray-700 flex items-center justify-center transition cursor-pointer"
+                    :title="dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+                    aria-label="Toggle Dark or Light Mode">
+                    <svg x-show="dark" style="display: none;" class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>
+                    </svg>
+                    <svg x-show="!dark" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                    </svg>
+                </button>
+
                 <a href="/admin/orders" @click="markAttended('orders', {{ $navCounts['orders'] }})" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-teal-50 text-[#0d9488] hover:bg-teal-100 font-extrabold text-xs transition">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 11h14l1 12H4L5 11z"></path></svg>
                     Orders & Refunds

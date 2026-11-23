@@ -65,7 +65,271 @@
 
     <style>
         [x-cloak] { display: none !important; }
+
+        /* ==============================================================
+           GLOBAL DARK MODE SYSTEM (Covers Home, Auth, Dashboard & Admin)
+           ============================================================== */
+        html.dark {
+            color-scheme: dark;
+            background-color: #0b1120;
+            color: #f1f5f9;
+        }
+        html.dark body {
+            background-color: #0b1120 !important;
+            color: #f1f5f9 !important;
+        }
+
+        /* 1. Landing Page (.edus-theme) & Auth Pages (.auth-wrapper) CSS Variables */
+        html.dark .edus-theme {
+            --text-main: #f1f5f9 !important;
+            --text-muted: #94a3b8 !important;
+            --bg-body: #0b1120 !important;
+            --bg-alt: #0f172a !important;
+            --white: #1e293b !important;
+            --glass: rgba(15, 23, 42, 0.92) !important;
+            background-color: #0b1120 !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .edus-header.scrolled {
+            background: rgba(15, 23, 42, 0.96) !important;
+            border-bottom-color: rgba(45, 212, 191, 0.18) !important;
+        }
+        html.dark .edus-logo-icon,
+        html.dark .hero-showcase-card,
+        html.dark .step-card,
+        html.dark .testimonial-card,
+        html.dark .faq-item,
+        html.dark .edus-footer,
+        html.dark .mobile-drawer,
+        html.dark .about-card-visual {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .auth-wrapper {
+            --text-main: #f1f5f9 !important;
+            --text-muted: #94a3b8 !important;
+            --bg-body: #0b1120 !important;
+            background-color: #0b1120 !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .auth-card {
+            background: #1e293b !important;
+            border-color: #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        html.dark .auth-tabs {
+            background: #0f172a !important;
+            border-color: #334155 !important;
+        }
+        html.dark .auth-tab.active {
+            background: #1e293b !important;
+            color: #2dd4bf !important;
+        }
+        html.dark .input-group-modern label {
+            color: #cbd5e1 !important;
+        }
+        html.dark .input-field-modern,
+        html.dark .otp-digit-box {
+            background: #0f172a !important;
+            border-color: #334155 !important;
+            color: #f8fafc !important;
+        }
+        html.dark .input-field-modern:focus,
+        html.dark .otp-digit-box:focus {
+            background: #0b1120 !important;
+            border-color: #14b8a6 !important;
+        }
+
+        /* 2. Tailwind Surface & Background Remapping in Dark Mode */
+        html.dark .bg-\[\#f8fafc\],
+        html.dark .bg-gray-50,
+        html.dark .bg-slate-50,
+        html.dark .bg-gray-100 {
+            background-color: #0b1120 !important;
+        }
+        html.dark .bg-gray-50\/60,
+        html.dark .bg-gray-50\/70,
+        html.dark .bg-gray-50\/80,
+        html.dark .bg-slate-50\/70,
+        html.dark .bg-slate-50\/90,
+        html.dark .bg-slate-100,
+        html.dark .bg-slate-100\/80,
+        html.dark .bg-gray-100\/80 {
+            background-color: #0f172a !important;
+        }
+        html.dark .bg-white {
+            background-color: #1e293b !important;
+        }
+        html.dark .bg-white\/95,
+        html.dark .bg-white\/90,
+        html.dark .bg-white\/80 {
+            background-color: rgba(30, 41, 59, 0.95) !important;
+        }
+        html.dark .from-gray-50\/80 {
+            --tw-gradient-from: #0f172a var(--tw-gradient-from-position) !important;
+        }
+        html.dark .via-white {
+            --tw-gradient-via: #1e293b var(--tw-gradient-via-position) !important;
+        }
+        html.dark .to-teal-50\/30 {
+            --tw-gradient-to: rgba(13, 148, 136, 0.12) var(--tw-gradient-to-position) !important;
+        }
+
+        /* Soft pastel alert/badge backgrounds in dark mode */
+        html.dark .bg-teal-50,
+        html.dark .bg-teal-50\/30,
+        html.dark .bg-teal-50\/40,
+        html.dark .bg-teal-50\/60,
+        html.dark .bg-teal-50\/80 {
+            background-color: rgba(13, 148, 136, 0.16) !important;
+        }
+        html.dark .bg-emerald-50,
+        html.dark .bg-emerald-50\/80 {
+            background-color: rgba(16, 185, 129, 0.15) !important;
+        }
+        html.dark .bg-amber-50,
+        html.dark .bg-amber-50\/90 {
+            background-color: rgba(245, 158, 11, 0.15) !important;
+        }
+        html.dark .bg-rose-50,
+        html.dark .bg-red-50 {
+            background-color: rgba(244, 63, 94, 0.15) !important;
+        }
+        html.dark .from-teal-50,
+        html.dark .from-amber-50 {
+            --tw-gradient-from: rgba(15, 23, 42, 0.9) var(--tw-gradient-from-position) !important;
+        }
+        html.dark .to-orange-50,
+        html.dark .to-amber-50\/50 {
+            --tw-gradient-to: rgba(30, 41, 59, 0.9) var(--tw-gradient-to-position) !important;
+        }
+
+        /* 3. Typography & Text Colors in Dark Mode */
+        html.dark .text-gray-900,
+        html.dark .text-slate-900,
+        html.dark .text-gray-800,
+        html.dark .text-slate-800 {
+            color: #f1f5f9 !important;
+        }
+        html.dark .text-gray-700,
+        html.dark .text-slate-700,
+        html.dark .text-gray-600,
+        html.dark .text-slate-600 {
+            color: #cbd5e1 !important;
+        }
+        html.dark .text-gray-500,
+        html.dark .text-slate-500,
+        html.dark .text-gray-400,
+        html.dark .text-slate-400 {
+            color: #94a3b8 !important;
+        }
+        html.dark .text-amber-900,
+        html.dark .text-amber-800 {
+            color: #fcd34d !important;
+        }
+        html.dark .text-emerald-800,
+        html.dark .text-emerald-700,
+        html.dark .text-green-700 {
+            color: #6ee7b7 !important;
+        }
+        html.dark .text-teal-900,
+        html.dark .text-teal-800,
+        html.dark .text-teal-700 {
+            color: #5eead4 !important;
+        }
+        html.dark .text-rose-800,
+        html.dark .text-rose-700,
+        html.dark .text-red-700 {
+            color: #fda4af !important;
+        }
+
+        /* 4. Borders & Dividers in Dark Mode */
+        html.dark .border-gray-100,
+        html.dark .border-slate-100,
+        html.dark .border-gray-200,
+        html.dark .border-gray-200\/60,
+        html.dark .border-gray-200\/80,
+        html.dark .border-slate-200,
+        html.dark .border-slate-200\/70,
+        html.dark .border-slate-200\/80,
+        html.dark .border-slate-200\/90,
+        html.dark .border-gray-300,
+        html.dark .border-slate-300 {
+            border-color: #334155 !important;
+        }
+        html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]),
+        html.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]),
+        html.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+        html.dark .divide-slate-200 > :not([hidden]) ~ :not([hidden]) {
+            border-color: #334155 !important;
+        }
+
+        /* 5. Form Inputs, Selects & Textareas in Dark Mode */
+        html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]),
+        html.dark select,
+        html.dark textarea {
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
+            border-color: #334155 !important;
+        }
+        html.dark input::placeholder,
+        html.dark textarea::placeholder {
+            color: #64748b !important;
+        }
+        html.dark input:disabled,
+        html.dark select:disabled {
+            background-color: #1e293b !important;
+            color: #64748b !important;
+        }
+
+        /* 6. Hover State Refinements in Dark Mode */
+        html.dark .hover\:bg-gray-50:hover,
+        html.dark .hover\:bg-gray-50\/50:hover,
+        html.dark .hover\:bg-slate-50:hover,
+        html.dark .hover\:bg-gray-100:hover,
+        html.dark .hover\:bg-slate-100:hover {
+            background-color: #334155 !important;
+        }
+        html.dark .hover\:bg-teal-50:hover,
+        html.dark .hover\:bg-teal-50\/30:hover,
+        html.dark .hover\:bg-teal-50\/80:hover {
+            background-color: rgba(13, 148, 136, 0.22) !important;
+        }
     </style>
+
+    <!-- Instant Theme Initializer (Prevents Flash of Wrong Theme + Global Toggle API) -->
+    <script>
+        (function () {
+            function getSavedTheme() {
+                try {
+                    return localStorage.getItem('may22_theme') || 'light';
+                } catch (e) {
+                    return 'light';
+                }
+            }
+            function applyTheme(theme) {
+                var root = document.documentElement;
+                if (theme === 'dark') {
+                    root.classList.add('dark');
+                } else {
+                    root.classList.remove('dark');
+                }
+                window.__may22Theme = theme;
+                window.dispatchEvent(new CustomEvent('may22-theme-changed', { detail: { theme: theme } }));
+            }
+            applyTheme(getSavedTheme());
+
+            window.toggleSiteTheme = function () {
+                var next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
+                try {
+                    localStorage.setItem('may22_theme', next);
+                } catch (e) {}
+                applyTheme(next);
+                return next;
+            };
+        })();
+    </script>
 
     @php
         $viteEntries = ['resources/css/app.css', 'resources/js/app.js'];

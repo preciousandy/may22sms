@@ -1212,6 +1212,18 @@
 
                 <!-- Desktop Actions -->
                 <div class="hidden md:flex items-center gap-3">
+                    <!-- Dark / Light Mode Toggle -->
+                    <button
+                        type="button"
+                        x-data="{ dark: document.documentElement.classList.contains('dark') }"
+                        @may22-theme-changed.window="dark = ($event.detail.theme === 'dark')"
+                        @click="dark = (window.toggleSiteTheme() === 'dark')"
+                        class="w-10 h-10 rounded-full border border-teal-500/25 bg-white hover:border-teal-500 text-slate-700 flex items-center justify-center transition cursor-pointer shadow-xs"
+                        :title="dark ? 'Switch to Light Mode' : 'Switch to Dark Mode'"
+                        aria-label="Toggle Dark or Light Mode">
+                        <i class="fas text-sm" :class="dark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
+                    </button>
+
                     @auth
                         <a href="/dashboard" class="btn-cta">
                             <i class="fas fa-gauge-high"></i> Dashboard
@@ -1226,15 +1238,26 @@
                     @endauth
                 </div>
 
-                <!-- Mobile Hamburger Toggle -->
-                <button
-                    type="button"
-                    class="md:hidden text-teal-600 p-2 text-2xl focus:outline-none"
-                    @click="mobileMenu = true"
-                    aria-label="Open menu"
-                >
-                    <i class="fas fa-bars"></i>
-                </button>
+                <!-- Mobile Hamburger & Theme Toggle -->
+                <div class="flex md:hidden items-center gap-2">
+                    <button
+                        type="button"
+                        x-data="{ dark: document.documentElement.classList.contains('dark') }"
+                        @may22-theme-changed.window="dark = ($event.detail.theme === 'dark')"
+                        @click="dark = (window.toggleSiteTheme() === 'dark')"
+                        class="w-9 h-9 rounded-full border border-teal-500/25 bg-white text-slate-700 flex items-center justify-center transition cursor-pointer"
+                        aria-label="Toggle Dark or Light Mode">
+                        <i class="fas text-sm" :class="dark ? 'fa-sun text-amber-400' : 'fa-moon text-slate-600'"></i>
+                    </button>
+                    <button
+                        type="button"
+                        class="text-teal-600 p-2 text-2xl focus:outline-none"
+                        @click="mobileMenu = true"
+                        aria-label="Open menu"
+                    >
+                        <i class="fas fa-bars"></i>
+                    </button>
+                </div>
             </nav>
         </div>
     </header>
