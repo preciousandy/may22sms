@@ -72,6 +72,19 @@
             </div>
 
             <div class="flex flex-wrap items-center gap-2.5 shrink-0">
+                @php
+                    $christmasModeObj = $modes->firstWhere('slug', 'christmas-mode');
+                @endphp
+                @if($christmasModeObj)
+                    <form action="{{ route('admin.seasonal.modes.toggle', $christmasModeObj->id) }}" method="POST">
+                        @csrf
+                        <button type="submit"
+                                class="px-4 py-2.5 rounded-xl {{ $christmasModeObj->is_active ? 'bg-emerald-400 text-slate-950 ring-2 ring-white' : 'bg-red-600 hover:bg-red-700 text-white' }} font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5">
+                            <span>🎄</span>
+                            <span>{{ $christmasModeObj->is_active ? 'Christmas Mode: ON (Click to Turn Off)' : '1-Click Christmas Mode Switch' }}</span>
+                        </button>
+                    </form>
+                @endif
                 @if($activeMode)
                     <a href="/dashboard?seasonal_preview={{ $activeMode->slug }}" target="_blank"
                        class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white font-extrabold text-xs transition flex items-center gap-1.5">
@@ -666,7 +679,7 @@
                 <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                     <label class="inline-flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
                         <input type="checkbox" name="animations_enabled" value="1" :checked="!editMode || editMode.animations_enabled" class="rounded text-[#0d9488]">
-                        <span>Enable Animations</span>
+                        <span>Enable Falling Snow / Particles</span>
                     </label>
                     <label class="inline-flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
                         <input type="checkbox" name="decorations_enabled" value="1" :checked="!editMode || editMode.decorations_enabled" class="rounded text-[#0d9488]">
@@ -684,6 +697,91 @@
                         <input type="checkbox" name="is_scheduled" value="1" :checked="editMode && editMode.is_scheduled" class="rounded text-[#0d9488]">
                         <span>Enable Auto-Schedule</span>
                     </label>
+                </div>
+
+                <!-- Advanced Snow Accumulation, Icy Borders & Christmas Controls -->
+                <div class="p-4 rounded-2xl bg-gray-50 border border-gray-200 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-black uppercase tracking-wider text-[#0d9488]">❄️ Snow Accumulation, Icy Borders & Winter Effects</span>
+                        <span class="text-[10px] font-bold text-gray-400">Applies to Christmas / Snow Modes</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <label class="inline-flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
+                            <input type="checkbox" name="effect_snow_accumulation" value="1"
+                                   :checked="!editMode || !editMode.visual_effects || editMode.visual_effects.snow_accumulation !== false"
+                                   class="rounded text-[#0d9488]">
+                            <span>Fluffy Snow Caps on Elements</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
+                            <input type="checkbox" name="effect_icy_borders" value="1"
+                                   :checked="!editMode || !editMode.visual_effects || editMode.visual_effects.icy_borders !== false"
+                                   class="rounded text-[#0d9488]">
+                            <span>Frosty / Icy Card Borders</span>
+                        </label>
+                        <label class="inline-flex items-center gap-2 font-bold text-gray-700 cursor-pointer">
+                            <input type="checkbox" name="effect_christmas_ornaments" value="1"
+                                   :checked="!editMode || !editMode.visual_effects || editMode.visual_effects.christmas_ornaments !== false"
+                                   class="rounded text-[#0d9488]">
+                            <span>Christmas Ornaments & Stars</span>
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Snow Cap Thickness</label>
+                            <select name="snow_cap_thickness"
+                                    :value="editMode && editMode.visual_effects && editMode.visual_effects.snow_cap_thickness ? editMode.visual_effects.snow_cap_thickness : 'medium'"
+                                    class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                                <option value="thin">Thin Frost Layer</option>
+                                <option value="medium">Medium Fluffy Snow (Recommended)</option>
+                                <option value="thick">Thick Winter Drift</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Snowflake Size</label>
+                            <select name="snowflake_size"
+                                    :value="editMode && editMode.visual_effects && editMode.visual_effects.snowflake_size ? editMode.visual_effects.snowflake_size : 'medium'"
+                                    class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                                <option value="small">Small Delicate Flakes</option>
+                                <option value="medium">Mixed Small & Medium (3D Depth)</option>
+                                <option value="large">Large Festive Snowflakes</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Snowfall Speed</label>
+                            <select name="snowflake_speed"
+                                    :value="editMode && editMode.visual_effects && editMode.visual_effects.snowflake_speed ? editMode.visual_effects.snowflake_speed : 'normal'"
+                                    class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                                <option value="slow">Gentle Slow Drift</option>
+                                <option value="normal">Natural Winter Breeze</option>
+                                <option value="fast">Brisk Snowfall</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Component Targets for Snow Accumulation -->
+                    <div class="pt-1">
+                        <span class="font-bold text-gray-600 block mb-1.5">UI Components with Snow Accumulation Caps:</span>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            @foreach([
+                                'cards' => 'Dashboard Cards',
+                                'wallet' => 'Wallet Container',
+                                'services' => 'Service Tiles',
+                                'buttons' => 'Action Buttons',
+                                'inputs' => 'Input Containers',
+                                'navbar' => 'Top & Bottom Navbars',
+                                'banners' => 'Promotional Banners',
+                            ] as $tKey => $tLabel)
+                                <label class="inline-flex items-center gap-1.5 font-semibold text-gray-700 cursor-pointer">
+                                    <input type="checkbox" name="snow_targets[]" value="{{ $tKey }}"
+                                           :checked="!editMode || !editMode.visual_effects || !editMode.visual_effects.snow_targets || editMode.visual_effects.snow_targets.includes('{{ $tKey }}')"
+                                           class="rounded text-[#0d9488]">
+                                    <span>{{ $tLabel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
                 </div>
 
                 <div class="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">

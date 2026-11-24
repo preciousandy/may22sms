@@ -134,6 +134,15 @@ class SeasonalController extends Controller
                 'header_garland' => $request->boolean('effect_header_garland', true),
                 'glowing_borders' => $request->boolean('effect_glowing_borders', true),
                 'floating_badges' => $request->boolean('effect_floating_badges', true),
+                'snow_accumulation' => $request->boolean('effect_snow_accumulation', true),
+                'icy_borders' => $request->boolean('effect_icy_borders', true),
+                'christmas_ornaments' => $request->boolean('effect_christmas_ornaments', true),
+                'snowflake_size' => in_array($request->input('snowflake_size'), ['small', 'medium', 'large'], true) ? $request->input('snowflake_size') : 'medium',
+                'snowflake_speed' => in_array($request->input('snowflake_speed'), ['slow', 'normal', 'fast'], true) ? $request->input('snowflake_speed') : 'normal',
+                'snow_cap_thickness' => in_array($request->input('snow_cap_thickness'), ['thin', 'medium', 'thick'], true) ? $request->input('snow_cap_thickness') : 'medium',
+                'snow_targets' => is_array($request->input('snow_targets')) && ! empty($request->input('snow_targets'))
+                    ? array_values($request->input('snow_targets'))
+                    : ['cards', 'wallet', 'services', 'buttons', 'inputs', 'navbar', 'banners'],
             ],
             'is_active' => false,
             'is_scheduled' => $request->boolean('is_scheduled', false),
@@ -205,6 +214,15 @@ class SeasonalController extends Controller
                 'header_garland' => $request->boolean('effect_header_garland', true),
                 'glowing_borders' => $request->boolean('effect_glowing_borders', true),
                 'floating_badges' => $request->boolean('effect_floating_badges', true),
+                'snow_accumulation' => $request->boolean('effect_snow_accumulation', true),
+                'icy_borders' => $request->boolean('effect_icy_borders', true),
+                'christmas_ornaments' => $request->boolean('effect_christmas_ornaments', true),
+                'snowflake_size' => in_array($request->input('snowflake_size'), ['small', 'medium', 'large'], true) ? $request->input('snowflake_size') : 'medium',
+                'snowflake_speed' => in_array($request->input('snowflake_speed'), ['slow', 'normal', 'fast'], true) ? $request->input('snowflake_speed') : 'normal',
+                'snow_cap_thickness' => in_array($request->input('snow_cap_thickness'), ['thin', 'medium', 'thick'], true) ? $request->input('snow_cap_thickness') : 'medium',
+                'snow_targets' => is_array($request->input('snow_targets')) && ! empty($request->input('snow_targets'))
+                    ? array_values($request->input('snow_targets'))
+                    : ['cards', 'wallet', 'services', 'buttons', 'inputs', 'navbar', 'banners'],
             ],
             'is_scheduled' => $request->boolean('is_scheduled'),
             'starts_at' => $validated['starts_at'] ?? null,
