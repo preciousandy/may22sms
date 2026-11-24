@@ -112,14 +112,14 @@ class SeasonalController extends Controller
             'name' => $validated['name'],
             'slug' => $slug,
             'theme_type' => $validated['theme_type'],
-            'icon' => $validated['icon'] ?: '🎉',
+            'icon' => ($validated['icon'] ?? '') ?: '🎉',
             'greeting_title' => $validated['greeting_title'],
             'greeting_subtitle' => $validated['greeting_subtitle'] ?? '',
-            'badge_text' => $validated['badge_text'] ?: $validated['name'],
+            'badge_text' => ($validated['badge_text'] ?? '') ?: $validated['name'],
             'primary_color' => $validated['primary_color'],
             'secondary_color' => $validated['secondary_color'],
             'accent_color' => $validated['accent_color'],
-            'banner_gradient' => $validated['banner_gradient'] ?: "linear-gradient(135deg, {$validated['secondary_color']} 0%, {$validated['primary_color']} 100%)",
+            'banner_gradient' => ($validated['banner_gradient'] ?? '') ?: "linear-gradient(135deg, {$validated['secondary_color']} 0%, {$validated['primary_color']} 100%)",
             'banner_image' => $bannerPath,
             'background_image' => $bgPath,
             'animation_type' => $validated['animation_type'],
@@ -183,14 +183,14 @@ class SeasonalController extends Controller
         $mode->update([
             'name' => $validated['name'],
             'theme_type' => $validated['theme_type'],
-            'icon' => $validated['icon'] ?: $mode->icon,
+            'icon' => ($validated['icon'] ?? '') ?: $mode->icon,
             'greeting_title' => $validated['greeting_title'],
             'greeting_subtitle' => $validated['greeting_subtitle'] ?? '',
-            'badge_text' => $validated['badge_text'] ?: $validated['name'],
+            'badge_text' => ($validated['badge_text'] ?? '') ?: $validated['name'],
             'primary_color' => $validated['primary_color'],
             'secondary_color' => $validated['secondary_color'],
             'accent_color' => $validated['accent_color'],
-            'banner_gradient' => $validated['banner_gradient'] ?: "linear-gradient(135deg, {$validated['secondary_color']} 0%, {$validated['primary_color']} 100%)",
+            'banner_gradient' => ($validated['banner_gradient'] ?? '') ?: "linear-gradient(135deg, {$validated['secondary_color']} 0%, {$validated['primary_color']} 100%)",
             'banner_image' => $bannerPath,
             'background_image' => $bgPath,
             'animation_type' => $validated['animation_type'],
@@ -324,10 +324,10 @@ class SeasonalController extends Controller
         $eligibleIds = $this->parseUserIdsCsv($validated['eligible_user_ids_csv'] ?? '');
 
         $gift = SeasonalGift::create([
-            'seasonal_mode_id' => $validated['seasonal_mode_id'] ?: null,
+            'seasonal_mode_id' => ($validated['seasonal_mode_id'] ?? null) ?: null,
             'name' => $validated['name'],
             'description' => $validated['description'] ?? '',
-            'icon_or_image' => $uploadedIcon ?: ($validated['icon_or_image'] ?: '🎁'),
+            'icon_or_image' => $uploadedIcon ?: (($validated['icon_or_image'] ?? '') ?: '🎁'),
             'gift_type' => $validated['gift_type'],
             'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
             'promo_code' => ! empty($validated['promo_code']) ? strtoupper(trim($validated['promo_code'])) : null,
@@ -396,10 +396,10 @@ class SeasonalController extends Controller
         $eligibleIds = $this->parseUserIdsCsv($validated['eligible_user_ids_csv'] ?? '');
 
         $gift->update([
-            'seasonal_mode_id' => $validated['seasonal_mode_id'] ?: null,
+            'seasonal_mode_id' => ($validated['seasonal_mode_id'] ?? null) ?: null,
             'name' => $validated['name'],
             'description' => $validated['description'] ?? '',
-            'icon_or_image' => $uploadedIcon ?: ($validated['icon_or_image'] ?: $gift->icon_or_image),
+            'icon_or_image' => $uploadedIcon ?: (($validated['icon_or_image'] ?? '') ?: $gift->icon_or_image),
             'gift_type' => $validated['gift_type'],
             'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
             'promo_code' => ! empty($validated['promo_code']) ? strtoupper(trim($validated['promo_code'])) : null,
@@ -501,12 +501,12 @@ class SeasonalController extends Controller
         ]);
 
         $ann = SeasonalAnnouncement::create([
-            'seasonal_mode_id' => $validated['seasonal_mode_id'] ?: null,
+            'seasonal_mode_id' => ($validated['seasonal_mode_id'] ?? null) ?: null,
             'title' => $validated['title'],
             'message' => $validated['message'],
-            'badge_text' => $validated['badge_text'] ?: 'Celebration',
-            'cta_text' => $validated['cta_text'] ?: null,
-            'cta_link' => $validated['cta_link'] ?: null,
+            'badge_text' => ($validated['badge_text'] ?? '') ?: 'Celebration',
+            'cta_text' => ($validated['cta_text'] ?? '') ?: null,
+            'cta_link' => ($validated['cta_link'] ?? '') ?: null,
             'is_dismissible' => $request->boolean('is_dismissible', true),
             'show_on_dashboard' => $request->boolean('show_on_dashboard', true),
             'show_on_home' => $request->boolean('show_on_home', true),

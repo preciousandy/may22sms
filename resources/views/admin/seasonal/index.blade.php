@@ -625,6 +625,13 @@
                     </div>
                 </div>
 
+                <div>
+                    <label class="font-bold text-gray-700 block mb-1">Banner CSS Gradient (Optional — auto-generated from Primary/Secondary colors if left blank)</label>
+                    <input type="text" name="banner_gradient" :value="editMode ? (editMode.banner_gradient || '') : ''"
+                           placeholder="e.g. linear-gradient(135deg, #7f1d1d 0%, #991b1b 45%, #14532d 100%)"
+                           class="w-full rounded-xl border border-gray-300 px-3.5 py-2 font-mono text-xs">
+                </div>
+
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
                         <label class="font-bold text-gray-700 block mb-1">Custom Banner Image (Optional)</label>
