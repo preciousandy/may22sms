@@ -253,7 +253,11 @@
                         <p class="text-[11px] {{ $day->day_number === 25 ? 'text-amber-200' : 'text-gray-500' }} mt-0.5 line-clamp-2">{{ $day->description }}</p>
                         <div class="mt-2 text-xs font-black {{ $day->day_number === 25 ? 'text-amber-300' : 'text-[#0d9488]' }}">
                             @if($day->reward_value_usd > 0)
-                                +{{ $currencySymbol ?? '$' }}{{ number_format($day->reward_value_usd * ($currencyFx ?? 1), 2) }}
+                                @php
+                                    $dayNgn = $day->reward_value_usd * ($ngnPerUsd ?? 1500);
+                                    $cleanDayNgn = ($dayNgn > 0 && $dayNgn <= 2.5) ? max(1, min(2, round($dayNgn))) : $dayNgn;
+                                @endphp
+                                +₦{{ number_format($cleanDayNgn, 2) }}
                             @elseif($day->discount_percent > 0)
                                 {{ $day->discount_percent }}% OFF Coupon
                             @else
@@ -270,7 +274,12 @@
                         </template>
 
                         <template x-if="!claimedAdvent.includes({{ $day->day_number }})">
-                            @if($unlocked)
+                            @if(!($featureSettings['xmas_claim_buttons_enabled'] ?? true) || !$day->is_enabled)
+                                <button type="button" disabled
+                                        class="w-full py-2 rounded-xl bg-gray-200/70 text-gray-500 font-bold text-[11px] flex items-center justify-center gap-1 cursor-not-allowed">
+                                    🔒 Claim Disabled
+                                </button>
+                            @elseif($unlocked)
                                 <button type="button"
                                         @click="claimAdventBox({{ $day->day_number }})"
                                         :disabled="claimingAdventDay === {{ $day->day_number }}"
@@ -629,12 +638,20 @@
                         </div>
 
                         <div class="flex items-center justify-between sm:flex-col sm:items-end gap-2 shrink-0">
+                            @php
+                                $chalNgn = $ch->reward_value_usd * ($ngnPerUsd ?? 1500);
+                                $cleanChalNgn = ($chalNgn > 0 && $chalNgn <= 2.5) ? max(1, min(2, round($chalNgn))) : $chalNgn;
+                            @endphp
                             <span class="text-sm font-black text-[#0d9488]">
-                                +{{ $currencySymbol ?? '$' }}{{ number_format($ch->reward_value_usd * ($currencyFx ?? 1), 2) }}
+                                +₦{{ number_format($cleanChalNgn, 2) }}
                             </span>
 
                             @if($isClaimed)
                                 <span class="px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-black text-xs">✅ Reward Claimed</span>
+                            @elseif(!($featureSettings['xmas_claim_buttons_enabled'] ?? true))
+                                <button type="button" disabled class="px-3 py-1.5 rounded-xl bg-gray-200 text-gray-500 font-bold text-xs cursor-not-allowed">
+                                    🔒 Claim Disabled
+                                </button>
                             @elseif($isDone)
                                 <button type="button"
                                         @click="claimChallengeReward({{ $ch->id }})"
@@ -788,7 +805,11 @@
                                 <h4 class="font-black text-gray-900 text-base">{{ $g->name }}</h4>
                                 <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-emerald-100 text-emerald-800">
                                     @if($g->reward_value_usd > 0)
-                                        +{{ $currencySymbol ?? '$' }}{{ number_format($g->reward_value_usd * ($currencyFx ?? 1), 2) }}
+                                        @php
+                                            $gNgn = $g->reward_value_usd * ($ngnPerUsd ?? 1500);
+                                            $cleanGNgn = ($gNgn > 0 && $gNgn <= 2.5) ? max(1, min(2, round($gNgn))) : $gNgn;
+                                        @endphp
+                                        +₦{{ number_format($cleanGNgn, 2) }}
                                     @elseif($g->discount_percent > 0)
                                         {{ $g->discount_percent }}% OFF
                                     @else
@@ -802,13 +823,20 @@
 
                     <div class="flex items-center justify-between pt-3 border-t border-gray-100">
                         <span class="text-[11px] font-bold text-gray-400 uppercase">{{ str_replace('_', ' ', $g->gift_type) }}</span>
-                        <button type="button"
-                                @click="claimSpecialGift({{ $g->id }})"
-                                :disabled="claimedGifts.includes({{ $g->id }})"
-                                :class="claimedGifts.includes({{ $g->id }}) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0d9488] hover:bg-teal-700 text-white shadow cursor-pointer'"
-                                class="px-5 py-2 rounded-xl font-black text-xs transition">
-                            <span x-text="claimedGifts.includes({{ $g->id }}) ? '✅ Already Claimed' : '{{ $g->claim_button_text ?: 'Claim Gift 🎁' }}'"></span>
-                        </button>
+                        @if($featureSettings['xmas_claim_buttons_enabled'] ?? true)
+                            <button type="button"
+                                    @click="claimSpecialGift({{ $g->id }})"
+                                    :disabled="claimedGifts.includes({{ $g->id }})"
+                                    :class="claimedGifts.includes({{ $g->id }}) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-[#0d9488] hover:bg-teal-700 text-white shadow cursor-pointer'"
+                                    class="px-5 py-2 rounded-xl font-black text-xs transition">
+                                <span x-text="claimedGifts.includes({{ $g->id }}) ? '✅ Already Claimed' : '{{ $g->claim_button_text ?: 'Claim Gift 🎁' }}'"></span>
+                            </button>
+                        @else
+                            <button type="button" disabled
+                                    class="px-4 py-2 rounded-xl bg-gray-200 text-gray-500 font-bold text-xs cursor-not-allowed">
+                                🔒 Claim Disabled
+                            </button>
+                        @endif
                     </div>
                 </div>
             @empty
@@ -1119,3 +1147,4 @@
     }
 </script>
 @endsection
+

@@ -88,7 +88,7 @@
                         <span class="text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-0.5 rounded-full shadow-xs animate-pulse">Claim</span>
                     </a>
 
-                    @if(isset($activeSeasonalMode) && $activeSeasonalMode && ($activeSeasonalMode->theme_type === 'christmas' || $activeSeasonalMode->is_active))
+                    @if(isset($activeSeasonalMode) && $activeSeasonalMode && ($activeSeasonalMode->theme_type === 'christmas' || $activeSeasonalMode->is_active) && ($seasonalFeatureSettings['xmas_hub_button_enabled'] ?? true))
                         <a href="/christmas-wonderland" class="flex items-center justify-between py-2.5 px-3.5 rounded-xl font-bold text-sm transition-all {{ request()->is('christmas-wonderland*') ? 'bg-red-700 text-white shadow-md' : 'text-red-100 bg-gradient-to-r from-red-900 via-red-800 to-emerald-900 hover:brightness-110' }}">
                             <div class="flex items-center gap-3">
                                 <span class="text-base leading-none">🎄</span>

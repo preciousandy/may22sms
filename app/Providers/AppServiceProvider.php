@@ -256,10 +256,16 @@ class AppServiceProvider extends ServiceProvider
             // Inject active seasonal celebration mode & user preferences
             $activeSeasonalMode = null;
             $seasonalUserPref = null;
+            $seasonalFeatureSettings = [
+                'xmas_hub_button_enabled' => true,
+                'xmas_claim_buttons_enabled' => true,
+            ];
             try {
                 if (Schema::hasTable('seasonal_modes')) {
+                    $seasonalEngine = app(\App\Services\SeasonalEngineService::class);
                     $previewId = request()->query('seasonal_preview');
-                    $activeSeasonalMode = app(\App\Services\SeasonalEngineService::class)->resolveActiveMode(auth()->user(), $previewId);
+                    $activeSeasonalMode = $seasonalEngine->resolveActiveMode(auth()->user(), $previewId);
+                    $seasonalFeatureSettings = $seasonalEngine->getInteractiveFeatureSettings();
                     if ($activeSeasonalMode && auth()->check() && Schema::hasTable('seasonal_user_preferences')) {
                         $seasonalUserPref = \App\Models\SeasonalUserPreference::where('user_id', auth()->id())->first();
                     }
@@ -269,6 +275,7 @@ class AppServiceProvider extends ServiceProvider
             }
             $view->with('activeSeasonalMode', $activeSeasonalMode);
             $view->with('seasonalUserPref', $seasonalUserPref);
+            $view->with('seasonalFeatureSettings', $seasonalFeatureSettings);
         });
     }
 }

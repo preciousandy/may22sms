@@ -86,7 +86,7 @@ class SeasonalEngineService
                     'description' => 'Unwrap your festive Christmas wallet credit from the May22SMS team!',
                     'icon_or_image' => '🎁',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.15,
+                    'reward_value_usd' => 0.0013, // ~₦2.00 at 1500 NGN/USD
                     'claim_button_text' => 'Claim Your Christmas Gift 🎄',
                 ],
                 'default_announcement' => [
@@ -135,7 +135,7 @@ class SeasonalEngineService
                     'description' => 'Start the New Year with free bonus credits for SMS verifications and social boosting!',
                     'icon_or_image' => '🥂',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.20,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim New Year Gift 🎆',
                 ],
                 'default_announcement' => [
@@ -184,7 +184,7 @@ class SeasonalEngineService
                     'description' => 'A sweet token of appreciation for choosing MAY22SMS!',
                     'icon_or_image' => '💝',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.12,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim Valentine Gift 💖',
                 ],
             ],
@@ -226,7 +226,7 @@ class SeasonalEngineService
                     'description' => 'You found the May22SMS Golden Easter Egg! Claim your free bonus credit now.',
                     'icon_or_image' => '🥚',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.10,
+                    'reward_value_usd' => 0.0007,
                     'claim_button_text' => 'Crack Open Easter Gift 🐣',
                 ],
             ],
@@ -268,7 +268,7 @@ class SeasonalEngineService
                     'description' => 'Grab your spooky Halloween treat credit before midnight!',
                     'icon_or_image' => '🎃',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.10,
+                    'reward_value_usd' => 0.0007,
                     'claim_button_text' => 'Claim Halloween Treat 🎃',
                 ],
             ],
@@ -310,7 +310,7 @@ class SeasonalEngineService
                     'description' => 'Celebrate October 1st with free wallet credit from MAY22SMS!',
                     'icon_or_image' => '🇳🇬',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.15,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim Independence Gift 🇳🇬',
                 ],
             ],
@@ -352,7 +352,7 @@ class SeasonalEngineService
                     'description' => 'Instant Black Friday bonus credit for your next SMS verification or log order!',
                     'icon_or_image' => '⚡',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.15,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim Black Friday Bonus ⚡',
                 ],
                 'default_announcement' => [
@@ -401,7 +401,7 @@ class SeasonalEngineService
                     'description' => 'Thank you for being part of the MAY22SMS community! Enjoy this special anniversary credit.',
                     'icon_or_image' => '👑',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.25,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim Anniversary Gift 👑',
                 ],
             ],
@@ -443,7 +443,7 @@ class SeasonalEngineService
                     'description' => 'Celebrate with a special Eid reward credit from MAY22SMS!',
                     'icon_or_image' => '🌙',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.15,
+                    'reward_value_usd' => 0.0013,
                     'claim_button_text' => 'Claim Eid Gift 🌙',
                 ],
             ],
@@ -485,7 +485,7 @@ class SeasonalEngineService
                     'description' => 'Claim your limited-time celebration bonus reward!',
                     'icon_or_image' => '🎁',
                     'gift_type' => 'wallet_credit',
-                    'reward_value_usd' => 0.10,
+                    'reward_value_usd' => 0.0007,
                     'claim_button_text' => 'Claim Special Gift 🎁',
                 ],
             ],
@@ -735,6 +735,11 @@ class SeasonalEngineService
 
             // 2. Check eligibility (unless forced by admin for selected_users)
             if ($distributionMethod === 'manual_claim') {
+                $featureSettings = $this->getInteractiveFeatureSettings();
+                if (! ($featureSettings['xmas_claim_buttons_enabled'] ?? true)) {
+                    throw new RuntimeException('Gift claiming is currently disabled by the administrator.');
+                }
+
                 $eligibility = $this->checkUserEligibility($lockedUser, $lockedGift);
                 if (! $eligibility['eligible']) {
                     throw new RuntimeException($eligibility['reason'] ?? 'You are not eligible for this gift.');
@@ -1091,35 +1096,74 @@ class SeasonalEngineService
     }
 
     /**
+     * Resolve current NGN per USD exchange rate for ₦1 - ₦2 reward calculations.
+     */
+    public function getNgnPerUsdRate(): float
+    {
+        $rate = 1500.0;
+        try {
+            if (Schema::hasTable('settings')) {
+                $val = (float) (\App\Models\Setting::where('key', 'ngn_per_usd')->value('value') ?? 1500.0);
+                if ($val > 0) {
+                    $rate = $val;
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        return $rate;
+    }
+
+    /**
      * Seed the 25-Day Advent Calendar, Festive Badges, Christmas Challenges, and Interactive Settings.
      */
     public function ensureInteractiveChristmasSeeded(): void
     {
+        $rate = $this->getNgnPerUsdRate();
+        $oneNairaUsd = round(1.00 / $rate, 4); // ~0.0007 USD (₦1.00)
+        $twoNairaUsd = round(2.00 / $rate, 4); // ~0.0013 USD (₦2.00)
+
         if (Schema::hasTable('seasonal_advent_days') && SeasonalAdventDay::count() === 0) {
             $icons = ['🎁', '🎄', '❄️', '🔔', '⭐', '🦌', '🍪', '🧦', '🕯️', '🎅', '⛄', '🎀'];
             $year = (int) now()->year;
             for ($d = 1; $d <= 25; $d++) {
                 $isGrand = ($d === 25);
                 $isMilestone = ($d % 5 === 0);
-                $rewardVal = $isGrand ? 0.50 : ($isMilestone ? 0.15 : 0.04);
-                $rewardType = ($d === 10 || $d === 20) ? 'discount_coupon' : (($d % 3 === 0) ? 'sms_credit' : 'wallet_credit');
+                // Strictly ₦1.00 normal days, max ₦2.00 on Milestone / Christmas Day
+                $rewardVal = ($isGrand || $isMilestone) ? $twoNairaUsd : $oneNairaUsd;
+                $rewardType = ($d % 3 === 0) ? 'sms_credit' : 'wallet_credit';
 
                 SeasonalAdventDay::create([
                     'day_number' => $d,
                     'title' => $isGrand ? 'Day 25: Grand Christmas Day Surprise! 🎅🎄' : "December Day {$d} Festive Box",
                     'description' => $isGrand
-                        ? 'Merry Christmas! Unwrap our biggest Christmas Day wallet bonus!'
-                        : ($rewardType === 'discount_coupon' ? 'Special 15% Discount Coupon for your next order!' : 'Free festive bonus credit for MAY22SMS services!'),
+                        ? 'Merry Christmas! Unwrap our Christmas Day wallet bonus!'
+                        : 'Free festive bonus credit for MAY22SMS services!',
                     'icon' => $isGrand ? '🎅' : $icons[($d - 1) % count($icons)],
                     'reward_type' => $rewardType,
-                    'reward_value_usd' => $rewardType === 'discount_coupon' ? 0.00 : $rewardVal,
-                    'promo_code' => $rewardType === 'discount_coupon' ? "XMASDAY{$d}" : null,
-                    'discount_percent' => $rewardType === 'discount_coupon' ? 15.0 : null,
+                    'reward_value_usd' => $rewardVal,
+                    'promo_code' => null,
+                    'discount_percent' => null,
                     'unlock_date' => Carbon::create($year, 12, $d)->toDateString(),
-                    'force_unlocked' => $d <= 3, // Pre-unlock Days 1-3 so users can enjoy immediately upon activation
+                    'force_unlocked' => $d <= 3,
                     'is_enabled' => true,
                 ]);
             }
+        } elseif (Schema::hasTable('seasonal_advent_days')) {
+            // Clamp any existing seeded Advent days that were above ₦2.00 down to ₦1.00 - ₦2.00
+            SeasonalAdventDay::where('reward_value_usd', '>', $twoNairaUsd * 1.5)->get()->each(function ($day) use ($oneNairaUsd, $twoNairaUsd) {
+                $isSpecial = ($day->day_number === 25 || $day->day_number % 5 === 0);
+                $day->update([
+                    'reward_type' => $day->reward_type === 'discount_coupon' ? 'wallet_credit' : $day->reward_type,
+                    'reward_value_usd' => $isSpecial ? $twoNairaUsd : $oneNairaUsd,
+                ]);
+            });
+        }
+
+        if (Schema::hasTable('seasonal_gifts')) {
+            // Clamp default seeded gifts that still have the old 0.10-0.25 USD default down to ₦1-₦2 unless custom-created
+            SeasonalGift::whereIn('reward_value_usd', [0.10, 0.12, 0.15, 0.20, 0.25])->update([
+                'reward_value_usd' => $twoNairaUsd,
+            ]);
         }
 
         if (Schema::hasTable('seasonal_badges') && SeasonalBadge::count() === 0) {
@@ -1197,7 +1241,7 @@ class SeasonalEngineService
                     'period_type' => 'daily',
                     'action_type' => 'visit_christmas_hub',
                     'target_count' => 1,
-                    'reward_value_usd' => 0.03,
+                    'reward_value_usd' => $oneNairaUsd,
                 ],
                 [
                     'code' => 'decorate_christmas_tree',
@@ -1207,7 +1251,7 @@ class SeasonalEngineService
                     'period_type' => 'seasonal',
                     'action_type' => 'decorate_tree',
                     'target_count' => 1,
-                    'reward_value_usd' => 0.05,
+                    'reward_value_usd' => $twoNairaUsd,
                 ],
                 [
                     'code' => 'build_festive_snowman',
@@ -1217,7 +1261,7 @@ class SeasonalEngineService
                     'period_type' => 'seasonal',
                     'action_type' => 'build_snowman',
                     'target_count' => 1,
-                    'reward_value_usd' => 0.05,
+                    'reward_value_usd' => $twoNairaUsd,
                 ],
                 [
                     'code' => 'open_advent_box',
@@ -1227,7 +1271,7 @@ class SeasonalEngineService
                     'period_type' => 'daily',
                     'action_type' => 'claim_advent_day',
                     'target_count' => 1,
-                    'reward_value_usd' => 0.04,
+                    'reward_value_usd' => $oneNairaUsd,
                 ],
                 [
                     'code' => 'explore_christmas_village',
@@ -1237,7 +1281,7 @@ class SeasonalEngineService
                     'period_type' => 'weekly',
                     'action_type' => 'explore_village',
                     'target_count' => 3,
-                    'reward_value_usd' => 0.05,
+                    'reward_value_usd' => $twoNairaUsd,
                 ],
                 [
                     'code' => 'create_christmas_card',
@@ -1247,17 +1291,25 @@ class SeasonalEngineService
                     'period_type' => 'weekly',
                     'action_type' => 'generate_greeting_card',
                     'target_count' => 1,
-                    'reward_value_usd' => 0.04,
+                    'reward_value_usd' => $oneNairaUsd,
                 ],
             ];
 
             foreach ($challenges as $c) {
                 SeasonalChallenge::create(array_merge($c, ['is_active' => true]));
             }
+        } elseif (Schema::hasTable('seasonal_challenges')) {
+            SeasonalChallenge::where('reward_value_usd', '>', $twoNairaUsd * 1.5)->get()->each(function ($ch) use ($oneNairaUsd, $twoNairaUsd) {
+                $ch->update([
+                    'reward_value_usd' => $ch->period_type === 'daily' ? $oneNairaUsd : $twoNairaUsd,
+                ]);
+            });
         }
 
         if (Schema::hasTable('seasonal_settings') && SeasonalSetting::count() === 0) {
             $defaults = [
+                'xmas_hub_button_enabled' => '1',
+                'xmas_claim_buttons_enabled' => '1',
                 'xmas_advent_enabled' => '1',
                 'xmas_tree_enabled' => '1',
                 'xmas_snowman_enabled' => '1',
@@ -1281,6 +1333,8 @@ class SeasonalEngineService
     public function getInteractiveFeatureSettings(): array
     {
         $defaults = [
+            'xmas_hub_button_enabled' => true,
+            'xmas_claim_buttons_enabled' => true,
             'xmas_advent_enabled' => true,
             'xmas_tree_enabled' => true,
             'xmas_snowman_enabled' => true,
@@ -1307,10 +1361,28 @@ class SeasonalEngineService
     }
 
     /**
+     * Format a USD reward amount into clean Naira (₦1.00 or ₦2.00 for Christmas Hub micro-gifts).
+     */
+    public function formatNairaReward(float $usdAmount): string
+    {
+        $ngn = $usdAmount * $this->getNgnPerUsdRate();
+        if ($ngn > 0 && $ngn <= 2.5) {
+            $ngn = max(1.0, min(2.0, round($ngn)));
+        }
+
+        return '₦' . number_format($ngn, 2);
+    }
+
+    /**
      * Claim a day from the 25-Day Christmas Advent Calendar atomically.
      */
     public function claimAdventDay(User $user, int $dayNumber): array
     {
+        $featureSettings = $this->getInteractiveFeatureSettings();
+        if (! ($featureSettings['xmas_claim_buttons_enabled'] ?? true)) {
+            throw new RuntimeException('Advent gift claiming is currently disabled by the administrator.');
+        }
+
         return DB::transaction(function () use ($user, $dayNumber) {
             $day = SeasonalAdventDay::where('day_number', $dayNumber)->lockForUpdate()->firstOrFail();
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
@@ -1409,7 +1481,7 @@ class SeasonalEngineService
                 'new_balance_usd' => (float) ($freshUser->walletBalance ?? 0),
                 'earned_badges' => $earnedBadges,
                 'message' => $rewardUsd > 0
-                    ? "🎄 Day {$dayNumber} Unwrapped! $" . number_format($rewardUsd, 2) . " USD has been added to your wallet!"
+                    ? "🎄 Day {$dayNumber} Unwrapped! " . $this->formatNairaReward($rewardUsd) . " has been added to your wallet!"
                     : "🎄 Day {$dayNumber} Unwrapped! Your festive promo code is: {$rewardCode}",
             ];
         });
@@ -1529,6 +1601,11 @@ class SeasonalEngineService
      */
     public function claimChallengeReward(User $user, int $challengeId): array
     {
+        $featureSettings = $this->getInteractiveFeatureSettings();
+        if (! ($featureSettings['xmas_claim_buttons_enabled'] ?? true)) {
+            throw new RuntimeException('Challenge reward claiming is currently disabled by the administrator.');
+        }
+
         return DB::transaction(function () use ($user, $challengeId) {
             $challenge = SeasonalChallenge::lockForUpdate()->findOrFail($challengeId);
             $lockedUser = User::lockForUpdate()->findOrFail($user->id);
@@ -1573,7 +1650,7 @@ class SeasonalEngineService
             return [
                 'reward_usd' => $rewardUsd,
                 'new_balance_usd' => (float) ($freshUser->walletBalance ?? 0),
-                'message' => "🎉 Challenge Reward Claimed! +$" . number_format($rewardUsd, 2) . " USD credited to your wallet!",
+                'message' => "🎉 Challenge Reward Claimed! +" . $this->formatNairaReward($rewardUsd) . " credited to your wallet!",
             ];
         });
     }

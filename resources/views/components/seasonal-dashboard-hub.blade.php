@@ -100,10 +100,12 @@
                                 class="px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition cursor-pointer">
                             📜 My Claimed Gifts History
                         </button>
-                        <a href="/christmas-wonderland"
-                           class="px-3.5 py-1 rounded-full text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-sm transition flex items-center gap-1">
-                            <span>🎄 Open Interactive Christmas Wonderland (Advent, Tree, Snowman &amp; Village) &rarr;</span>
-                        </a>
+                        @if($seasonalFeatureSettings['xmas_hub_button_enabled'] ?? true)
+                            <a href="/christmas-wonderland"
+                               class="px-3.5 py-1 rounded-full text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-sm transition flex items-center gap-1">
+                                <span>🎄 Open Interactive Christmas Wonderland (Advent, Tree, Snowman &amp; Village) &rarr;</span>
+                            </a>
+                        @endif
                     </div>
 
                     <h2 class="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">
@@ -147,7 +149,11 @@
                                         <h3 class="font-black text-white text-sm sm:text-base truncate">{{ $gift->name }}</h3>
                                         <span class="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-400 text-slate-950 shrink-0">
                                             @if($gift->reward_value_usd > 0)
-                                                {{ $currencySymbol ?? '$' }}{{ number_format($gift->reward_value_usd * ($currencyFx ?? 1), 2) }}
+                                                @php
+                                                    $giftNgn = $gift->reward_value_usd * ($ngnPerUsd ?? 1500);
+                                                    $displayNgn = ($giftNgn > 0 && $giftNgn <= 2.5) ? max(1, min(2, round($giftNgn))) : $giftNgn;
+                                                @endphp
+                                                ₦{{ number_format($displayNgn, 2) }}
                                             @elseif($gift->discount_percent > 0)
                                                 {{ $gift->discount_percent }}% OFF
                                             @else
@@ -171,23 +177,30 @@
                                     {{ str_replace('_', ' ', $gift->gift_type) }}
                                 </span>
 
-                                <button type="button"
-                                        @click="claimSeasonalGift({{ $gift->id }})"
-                                        :disabled="claimingGiftId === {{ $gift->id }} || claimedIds.includes({{ $gift->id }})"
-                                        :class="claimedIds.includes({{ $gift->id }})
-                                            ? 'bg-emerald-500/40 text-emerald-100 border border-emerald-400/40 cursor-not-allowed'
-                                            : 'bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-slate-950 shadow-lg cursor-pointer active:scale-95'"
-                                        class="px-5 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-2">
-                                    <template x-if="claimingGiftId === {{ $gift->id }}">
-                                        <span>Claiming Gift...</span>
-                                    </template>
-                                    <template x-if="claimingGiftId !== {{ $gift->id }} && claimedIds.includes({{ $gift->id }})">
-                                        <span>✅ Gift Claimed</span>
-                                    </template>
-                                    <template x-if="claimingGiftId !== {{ $gift->id }} && !claimedIds.includes({{ $gift->id }})">
-                                        <span>{{ $gift->claim_button_text ?: 'Claim Your Gift 🎁' }}</span>
-                                    </template>
-                                </button>
+                                @if($seasonalFeatureSettings['xmas_claim_buttons_enabled'] ?? true)
+                                    <button type="button"
+                                            @click="claimSeasonalGift({{ $gift->id }})"
+                                            :disabled="claimingGiftId === {{ $gift->id }} || claimedIds.includes({{ $gift->id }})"
+                                            :class="claimedIds.includes({{ $gift->id }})
+                                                ? 'bg-emerald-500/40 text-emerald-100 border border-emerald-400/40 cursor-not-allowed'
+                                                : 'bg-gradient-to-r from-amber-400 to-yellow-300 hover:from-amber-300 hover:to-yellow-200 text-slate-950 shadow-lg cursor-pointer active:scale-95'"
+                                            class="px-5 py-2.5 rounded-xl font-black text-xs transition flex items-center gap-2">
+                                        <template x-if="claimingGiftId === {{ $gift->id }}">
+                                            <span>Claiming Gift...</span>
+                                        </template>
+                                        <template x-if="claimingGiftId !== {{ $gift->id }} && claimedIds.includes({{ $gift->id }})">
+                                            <span>✅ Gift Claimed</span>
+                                        </template>
+                                        <template x-if="claimingGiftId !== {{ $gift->id }} && !claimedIds.includes({{ $gift->id }})">
+                                            <span>{{ $gift->claim_button_text ?: 'Claim Your Gift 🎁' }}</span>
+                                        </template>
+                                    </button>
+                                @else
+                                    <button type="button" disabled
+                                            class="px-4 py-2 rounded-xl bg-white/10 text-white/60 border border-white/15 font-bold text-xs cursor-not-allowed">
+                                        🔒 Claim Disabled
+                                    </button>
+                                @endif
                             </div>
                         </div>
                     @endforeach

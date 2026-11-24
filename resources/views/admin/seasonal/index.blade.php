@@ -74,6 +74,8 @@
             <div class="flex flex-wrap items-center gap-2.5 shrink-0">
                 @php
                     $christmasModeObj = $modes->firstWhere('slug', 'christmas-mode');
+                    $hubBtnEnabled = (bool) ($featureSettings['xmas_hub_button_enabled'] ?? true);
+                    $claimBtnEnabled = (bool) ($featureSettings['xmas_claim_buttons_enabled'] ?? true);
                 @endphp
                 @if($christmasModeObj)
                     <form action="{{ route('admin.seasonal.modes.toggle', $christmasModeObj->id) }}" method="POST">
@@ -85,6 +87,24 @@
                         </button>
                     </form>
                 @endif
+                <form action="{{ route('admin.seasonal.toggle-christmas-button') }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="target" value="xmas_hub_button_enabled">
+                    <button type="submit"
+                            class="px-3.5 py-2.5 rounded-xl {{ $hubBtnEnabled ? 'bg-emerald-500/90 hover:bg-emerald-600 text-white' : 'bg-rose-600 hover:bg-rose-700 text-white' }} font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                            title="Show or hide the Christmas Hub button on user sidebar and dashboard banner">
+                        <span>{{ $hubBtnEnabled ? '✅ Hub Button: ENABLED (Disable)' : '🔒 Hub Button: DISABLED (Enable)' }}</span>
+                    </button>
+                </form>
+                <form action="{{ route('admin.seasonal.toggle-christmas-button') }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="target" value="xmas_claim_buttons_enabled">
+                    <button type="submit"
+                            class="px-3.5 py-2.5 rounded-xl {{ $claimBtnEnabled ? 'bg-amber-400 hover:bg-amber-300 text-slate-950' : 'bg-rose-600 hover:bg-rose-700 text-white' }} font-black text-xs shadow-md transition cursor-pointer flex items-center gap-1.5"
+                            title="Enable or disable all Gift, Advent & Challenge claim buttons for users">
+                        <span>{{ $claimBtnEnabled ? '🎁 Gift Claim Button: ENABLED (Disable)' : '🔒 Gift Claim Button: DISABLED (Enable)' }}</span>
+                    </button>
+                </form>
                 @if($activeMode)
                     <a href="/dashboard?seasonal_preview={{ $activeMode->slug }}" target="_blank"
                        class="px-4 py-2.5 rounded-xl bg-white/15 hover:bg-white/25 border border-white/25 text-white font-extrabold text-xs transition flex items-center gap-1.5">
@@ -553,12 +573,21 @@
     <div x-show="activeTab === 'advent'" style="display: none;" class="space-y-4">
         <div class="bg-white rounded-2xl p-5 border border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
-                <h3 class="text-base font-black text-gray-900">🗓️ 25-Day Christmas Advent Calendar Configuration</h3>
-                <p class="text-xs text-gray-500">Configure each day's title, reward type, USD amount, discount code, and unlock status.</p>
+                <h3 class="text-base font-black text-gray-900">🗓️ 25-Day Christmas Advent Calendar Configuration (₦1.00 – ₦2.00 Max)</h3>
+                <p class="text-xs text-gray-500">All Christmas Hub Advent gift boxes are priced between <strong>₦1.00 and ₦2.00 max</strong>. You can enable/disable each box button or toggle all claim buttons at once.</p>
             </div>
-            <a href="/christmas-wonderland" target="_blank" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition shrink-0">
-                👁️ Preview User Christmas Hub &rarr;
-            </a>
+            <div class="flex flex-wrap items-center gap-2 shrink-0">
+                <form action="{{ route('admin.seasonal.toggle-christmas-button') }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="target" value="reset_prices_1_2_naira">
+                    <button type="submit" class="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition cursor-pointer">
+                        ₦ Set All Gifts to ₦1–₦2
+                    </button>
+                </form>
+                <a href="/christmas-wonderland" target="_blank" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition shrink-0">
+                    👁️ Preview User Christmas Hub &rarr;
+                </a>
+            </div>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -601,8 +630,15 @@
                             </select>
                         </div>
                         <div>
-                            <label class="font-bold text-gray-600 block mb-1">Value (USD)</label>
-                            <input type="number" step="0.01" min="0" name="reward_value_usd" value="{{ $day->reward_value_usd }}" class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5 font-bold">
+                            @php
+                                $dayNgnVal = round($day->reward_value_usd * ($ngnPerUsd ?? 1500));
+                                $dayNgnVal = $day->reward_value_usd > 0 ? max(1, min(2, $dayNgnVal)) : 1;
+                            @endphp
+                            <label class="font-bold text-gray-600 block mb-1">Gift Price (₦1 – ₦2 Max)</label>
+                            <select name="reward_value_ngn" class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5 font-black text-[#0d9488]">
+                                <option value="1" {{ (int)$dayNgnVal === 1 ? 'selected' : '' }}>₦1.00 Naira</option>
+                                <option value="2" {{ (int)$dayNgnVal === 2 ? 'selected' : '' }}>₦2.00 Naira (Max)</option>
+                            </select>
                         </div>
                     </div>
 
@@ -676,8 +712,11 @@
                             <input type="number" min="1" name="target_count" value="1" required class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-bold">
                         </div>
                         <div>
-                            <label class="font-bold text-gray-700 block mb-1">Reward (USD)</label>
-                            <input type="number" step="0.01" min="0" name="reward_value_usd" value="0.05" required class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-bold">
+                            <label class="font-bold text-gray-700 block mb-1">Reward (₦1–₦2 Max)</label>
+                            <select name="reward_value_ngn" class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-black text-[#0d9488]">
+                                <option value="1">₦1.00 Naira</option>
+                                <option value="2">₦2.00 Naira (Max)</option>
+                            </select>
                         </div>
                     </div>
                     <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#0d9488] hover:bg-teal-700 text-white font-black text-xs cursor-pointer">
@@ -696,7 +735,10 @@
                                     {{ $ch->is_active ? 'Active' : 'Paused' }}
                                 </span>
                             </div>
-                            <p class="text-gray-500 mt-0.5">{{ $ch->description }} &bull; Reward: <strong class="text-[#0d9488]">${{ number_format($ch->reward_value_usd, 2) }}</strong></p>
+                            @php
+                                $chNgn = max(1, min(2, round($ch->reward_value_usd * ($ngnPerUsd ?? 1500))));
+                            @endphp
+                            <p class="text-gray-500 mt-0.5">{{ $ch->description }} &bull; Reward: <strong class="text-[#0d9488]">₦{{ number_format($chNgn, 2) }}</strong></p>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <form action="{{ route('admin.seasonal.challenges.toggle', $ch->id) }}" method="POST">
@@ -789,6 +831,8 @@
             @csrf
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
                 @foreach([
+                    'xmas_hub_button_enabled' => ['🎄 Christmas Hub Navigation & Banner Button', 'Enable or disable the Christmas Hub button on user sidebar and dashboard banner.'],
+                    'xmas_claim_buttons_enabled' => ['🎁 Christmas Gift & Advent Claim Buttons', 'Enable or disable all Gift, Advent Calendar, and Challenge claim buttons.'],
                     'xmas_advent_enabled' => ['🗓️ 25-Day Advent Calendar', 'Daily numbered Christmas gift boxes with automated unlock schedule.'],
                     'xmas_tree_enabled' => ['🎄 Interactive Christmas Tree', 'Allow users to decorate and save their personal evergreen tree.'],
                     'xmas_snowman_enabled' => ['⛄ Snowman Builder & Avatar', 'Allow users to build a snowman displayed on their festive profile card.'],

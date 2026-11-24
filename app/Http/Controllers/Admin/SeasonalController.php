@@ -624,23 +624,35 @@ class SeasonalController extends Controller
             'description' => 'nullable|string|max:255',
             'icon' => 'nullable|string|max:40',
             'reward_type' => 'required|in:wallet_credit,sms_credit,boosting_credit,discount_coupon,promo_code',
-            'reward_value_usd' => 'required|numeric|min:0|max:1000',
+            'reward_value_ngn' => 'nullable|numeric|min:1|max:2',
+            'reward_value_usd' => 'nullable|numeric|min:0|max:1000',
             'promo_code' => 'nullable|string|max:60',
             'discount_percent' => 'nullable|numeric|min:0|max:100',
             'unlock_date' => 'nullable|date',
         ]);
+
+        $rate = $this->engine->getNgnPerUsdRate();
+        if (isset($validated['reward_value_ngn']) && $validated['reward_value_ngn'] !== null && $validated['reward_value_ngn'] !== '') {
+            $ngnVal = max(1.0, min(2.0, (float) $validated['reward_value_ngn']));
+            $rewardUsd = round($ngnVal / $rate, 4);
+        } else {
+            $rawUsd = (float) ($validated['reward_value_usd'] ?? $day->reward_value_usd);
+            $maxTwoNairaUsd = round(2.0 / $rate, 4);
+            $minOneNairaUsd = round(1.0 / $rate, 4);
+            $rewardUsd = $rawUsd > 0 ? max($minOneNairaUsd, min($maxTwoNairaUsd, round($rawUsd, 4))) : 0.0;
+        }
 
         $day->update([
             'title' => $validated['title'],
             'description' => $validated['description'] ?? '',
             'icon' => ($validated['icon'] ?? '') ?: $day->icon,
             'reward_type' => $validated['reward_type'],
-            'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
+            'reward_value_usd' => $rewardUsd,
             'promo_code' => ! empty($validated['promo_code']) ? strtoupper(trim($validated['promo_code'])) : null,
             'discount_percent' => isset($validated['discount_percent']) ? (float) $validated['discount_percent'] : null,
             'unlock_date' => $validated['unlock_date'] ?? $day->unlock_date,
             'force_unlocked' => $request->boolean('force_unlocked'),
-            'is_enabled' => $request->boolean('is_enabled', true),
+            'is_enabled' => $request->boolean('is_enabled', false),
         ]);
 
         $admin = auth()->user();
@@ -661,9 +673,19 @@ class SeasonalController extends Controller
             'period_type' => 'required|in:daily,weekly,seasonal',
             'action_type' => 'required|in:visit_christmas_hub,complete_profile,claim_advent_day,decorate_tree,build_snowman,explore_village,generate_greeting_card',
             'target_count' => 'required|integer|min:1|max:100',
-            'reward_value_usd' => 'required|numeric|min:0|max:500',
+            'reward_value_ngn' => 'nullable|numeric|min:1|max:2',
+            'reward_value_usd' => 'nullable|numeric|min:0|max:500',
             'expires_at' => 'nullable|date',
         ]);
+
+        $rate = $this->engine->getNgnPerUsdRate();
+        if (isset($validated['reward_value_ngn']) && $validated['reward_value_ngn'] !== null && $validated['reward_value_ngn'] !== '') {
+            $ngnVal = max(1.0, min(2.0, (float) $validated['reward_value_ngn']));
+            $rewardUsd = round($ngnVal / $rate, 4);
+        } else {
+            $rawUsd = (float) ($validated['reward_value_usd'] ?? (1.0 / $rate));
+            $rewardUsd = max(round(1.0 / $rate, 4), min(round(2.0 / $rate, 4), round($rawUsd, 4)));
+        }
 
         $challenge = SeasonalChallenge::create([
             'code' => Str::slug($validated['title']) . '-' . strtolower(Str::random(4)),
@@ -673,7 +695,7 @@ class SeasonalController extends Controller
             'period_type' => $validated['period_type'],
             'action_type' => $validated['action_type'],
             'target_count' => (int) $validated['target_count'],
-            'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
+            'reward_value_usd' => $rewardUsd,
             'expires_at' => $validated['expires_at'] ?? null,
             'is_active' => true,
         ]);
@@ -740,6 +762,8 @@ class SeasonalController extends Controller
     public function updateInteractiveFeatures(Request $request)
     {
         $keys = [
+            'xmas_hub_button_enabled',
+            'xmas_claim_buttons_enabled',
             'xmas_advent_enabled',
             'xmas_tree_enabled',
             'xmas_snowman_enabled',
@@ -760,7 +784,61 @@ class SeasonalController extends Controller
         $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'update_interactive_features', 'seasonal_setting', null, 'Updated interactive Christmas feature toggles');
         $this->engine->clearCache();
 
-        return back()->with('success', 'Interactive Christmas features & music settings updated!');
+        return back()->with('success', 'Interactive Christmas features & button toggles updated!');
+    }
+
+    /**
+     * Quick 1-click toggle for Christmas Hub Button, Gift Claim Buttons, or Resetting all Christmas Hub Gift Prices to ₦1–₦2.
+     */
+    public function toggleChristmasButton(Request $request)
+    {
+        $target = (string) $request->input('target', 'xmas_hub_button_enabled');
+        $admin = auth()->user();
+
+        if ($target === 'reset_prices_1_2_naira') {
+            $rate = $this->engine->getNgnPerUsdRate();
+            $oneNairaUsd = round(1.00 / $rate, 4);
+            $twoNairaUsd = round(2.00 / $rate, 4);
+
+            SeasonalAdventDay::all()->each(function ($day) use ($oneNairaUsd, $twoNairaUsd) {
+                if ((float) $day->reward_value_usd > 0) {
+                    $day->update([
+                        'reward_value_usd' => ($day->day_number === 25 || $day->day_number % 5 === 0) ? $twoNairaUsd : $oneNairaUsd,
+                    ]);
+                }
+            });
+
+            SeasonalChallenge::all()->each(function ($ch) use ($oneNairaUsd, $twoNairaUsd) {
+                $ch->update([
+                    'reward_value_usd' => $ch->period_type === 'daily' ? $oneNairaUsd : $twoNairaUsd,
+                ]);
+            });
+
+            SeasonalGift::where('reward_value_usd', '>', 0)->get()->each(function ($g) use ($twoNairaUsd) {
+                $g->update([
+                    'reward_value_usd' => $twoNairaUsd,
+                ]);
+            });
+
+            $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'reset_christmas_prices', 'seasonal_setting', null, 'Set all Christmas Hub gift, Advent & Challenge prices to ₦1.00 – ₦2.00');
+            $this->engine->clearCache();
+
+            return back()->with('success', '✅ All Christmas Hub gift boxes, Advent Calendar days, and Challenges have been set to ₦1.00 – ₦2.00 max!');
+        }
+
+        if (! in_array($target, ['xmas_hub_button_enabled', 'xmas_claim_buttons_enabled'], true)) {
+            $target = 'xmas_hub_button_enabled';
+        }
+
+        $settings = $this->engine->getInteractiveFeatureSettings();
+        $newState = ! ($settings[$target] ?? true);
+        SeasonalSetting::setVal($target, $newState ? '1' : '0');
+
+        $label = $target === 'xmas_hub_button_enabled' ? 'Christmas Hub Button' : 'Christmas Hub Gift Claim Buttons';
+        $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'toggle_christmas_button', 'seasonal_setting', null, ($newState ? 'Enabled ' : 'Disabled ') . $label);
+        $this->engine->clearCache();
+
+        return back()->with('success', "{$label} is now " . ($newState ? 'ENABLED ✅' : 'DISABLED 🔒') . '!');
     }
 
     /**

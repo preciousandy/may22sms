@@ -58,3 +58,4 @@ class SeasonalAdventDay extends Model
         return false;
     }
 }
+

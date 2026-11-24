@@ -30,3 +30,4 @@ class SeasonalUserChallenge extends Model
         return $this->belongsTo(SeasonalChallenge::class, 'seasonal_challenge_id');
     }
 }
+

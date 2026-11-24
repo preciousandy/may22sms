@@ -451,6 +451,7 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::post('/seasonal/badges', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeBadge'])->name('admin.seasonal.badges.store');
     Route::post('/seasonal/badges/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleBadge'])->name('admin.seasonal.badges.toggle');
     Route::post('/seasonal/interactive-features', [\App\Http\Controllers\Admin\SeasonalController::class, 'updateInteractiveFeatures'])->name('admin.seasonal.interactive.update');
+    Route::post('/seasonal/toggle-christmas-button', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleChristmasButton'])->name('admin.seasonal.toggle-christmas-button');
 });
 
 // Quidax Webhook Endpoints

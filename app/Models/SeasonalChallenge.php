@@ -26,3 +26,4 @@ class SeasonalChallenge extends Model
         'is_active' => 'boolean',
     ];
 }
+
