@@ -103,5 +103,33 @@ class SeasonalEngineServiceTest extends TestCase
         $this->assertEquals(0.50, (float) $u1->fresh()->walletBalance);
         $this->assertEquals(0.50, (float) $u2->fresh()->walletBalance);
     }
+
+    public function test_advent_calendar_claiming_and_challenge_reward_and_badges(): void
+    {
+        $engine = app(SeasonalEngineService::class);
+        $engine->ensureDefaultsSeeded();
+        $engine->ensureInteractiveChristmasSeeded();
+
+        $user = User::factory()->create([
+            'walletBalance' => 1.00,
+            'account_status' => 'active',
+        ]);
+
+        // 1. Claim unlocked Day 1 of Advent Calendar
+        $adventRes = $engine->claimAdventDay($user, 1);
+        $this->assertGreaterThan(0, $adventRes['reward_usd']);
+        $this->assertEquals(1.00 + $adventRes['reward_usd'], $adventRes['new_balance_usd']);
+        $this->assertNotEmpty($adventRes['earned_badges']);
+
+        // 2. Complete tree decoration activity -> unlocks Christmas Tree Master badge & completes challenge
+        $eval = $engine->recordActivityAndEvaluate($user, 'decorate_tree');
+        $this->assertNotEmpty($eval['earned_badges']);
+        $this->assertNotEmpty($eval['completed_challenges']);
+
+        // 3. Claim completed challenge reward
+        $treeChallenge = \App\Models\SeasonalChallenge::where('action_type', 'decorate_tree')->firstOrFail();
+        $chalRes = $engine->claimChallengeReward($user->fresh(), $treeChallenge->id);
+        $this->assertEquals((float) $treeChallenge->reward_value_usd, $chalRes['reward_usd']);
+    }
 }
 

@@ -100,6 +100,10 @@
                                 class="px-3 py-1 rounded-full text-[11px] font-bold bg-white/15 hover:bg-white/25 text-white border border-white/20 transition cursor-pointer">
                             📜 My Claimed Gifts History
                         </button>
+                        <a href="/christmas-wonderland"
+                           class="px-3.5 py-1 rounded-full text-[11px] font-black bg-amber-400 hover:bg-amber-300 text-slate-950 shadow-sm transition flex items-center gap-1">
+                            <span>🎄 Open Interactive Christmas Wonderland (Advent, Tree, Snowman &amp; Village) &rarr;</span>
+                        </a>
                     </div>
 
                     <h2 class="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-white">

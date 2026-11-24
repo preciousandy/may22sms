@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SeasonalAdventDay;
 use App\Models\SeasonalAnnouncement;
 use App\Models\SeasonalAuditLog;
+use App\Models\SeasonalBadge;
+use App\Models\SeasonalChallenge;
 use App\Models\SeasonalGift;
 use App\Models\SeasonalGiftClaim;
 use App\Models\SeasonalMode;
+use App\Models\SeasonalSetting;
 use App\Services\SeasonalEngineService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -28,6 +32,7 @@ class SeasonalController extends Controller
     public function index(Request $request)
     {
         $this->engine->ensureDefaultsSeeded();
+        $this->engine->ensureInteractiveChristmasSeeded();
         $this->engine->syncScheduledModes();
 
         $modes = SeasonalMode::withCount(['gifts', 'claims'])
@@ -47,6 +52,20 @@ class SeasonalController extends Controller
             ->orderByDesc('id')
             ->get();
 
+        $adventDays = Schema::hasTable('seasonal_advent_days')
+            ? SeasonalAdventDay::orderBy('day_number')->get()
+            : collect();
+
+        $badges = Schema::hasTable('seasonal_badges')
+            ? SeasonalBadge::orderBy('id')->get()
+            : collect();
+
+        $challenges = Schema::hasTable('seasonal_challenges')
+            ? SeasonalChallenge::orderBy('id')->get()
+            : collect();
+
+        $featureSettings = $this->engine->getInteractiveFeatureSettings();
+
         $recentClaims = SeasonalGiftClaim::with(['user:id,name,email', 'gift:id,name,gift_type', 'mode:id,name,icon'])
             ->latest('claimed_at')
             ->limit(30)
@@ -63,6 +82,10 @@ class SeasonalController extends Controller
             'activeMode',
             'gifts',
             'announcements',
+            'adventDays',
+            'badges',
+            'challenges',
+            'featureSettings',
             'recentClaims',
             'auditLogs',
             'report'
@@ -587,6 +610,157 @@ class SeasonalController extends Controller
         $this->engine->clearCache();
 
         return back()->with('success', 'Seasonal announcement deleted.');
+    }
+
+    /**
+     * Update an Advent Calendar Day (1..25).
+     */
+    public function updateAdventDay(Request $request, int $id)
+    {
+        $day = SeasonalAdventDay::findOrFail($id);
+
+        $validated = $request->validate([
+            'title' => 'required|string|max:140',
+            'description' => 'nullable|string|max:255',
+            'icon' => 'nullable|string|max:40',
+            'reward_type' => 'required|in:wallet_credit,sms_credit,boosting_credit,discount_coupon,promo_code',
+            'reward_value_usd' => 'required|numeric|min:0|max:1000',
+            'promo_code' => 'nullable|string|max:60',
+            'discount_percent' => 'nullable|numeric|min:0|max:100',
+            'unlock_date' => 'nullable|date',
+        ]);
+
+        $day->update([
+            'title' => $validated['title'],
+            'description' => $validated['description'] ?? '',
+            'icon' => ($validated['icon'] ?? '') ?: $day->icon,
+            'reward_type' => $validated['reward_type'],
+            'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
+            'promo_code' => ! empty($validated['promo_code']) ? strtoupper(trim($validated['promo_code'])) : null,
+            'discount_percent' => isset($validated['discount_percent']) ? (float) $validated['discount_percent'] : null,
+            'unlock_date' => $validated['unlock_date'] ?? $day->unlock_date,
+            'force_unlocked' => $request->boolean('force_unlocked'),
+            'is_enabled' => $request->boolean('is_enabled', true),
+        ]);
+
+        $admin = auth()->user();
+        $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'update_advent_day', 'seasonal_advent_day', $day->id, "Updated Advent Calendar Day {$day->day_number}");
+
+        return back()->with('success', "Advent Calendar Day {$day->day_number} updated!");
+    }
+
+    /**
+     * Create or update a Seasonal Challenge.
+     */
+    public function storeChallenge(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:160',
+            'description' => 'required|string|max:255',
+            'icon' => 'nullable|string|max:40',
+            'period_type' => 'required|in:daily,weekly,seasonal',
+            'action_type' => 'required|in:visit_christmas_hub,complete_profile,claim_advent_day,decorate_tree,build_snowman,explore_village,generate_greeting_card',
+            'target_count' => 'required|integer|min:1|max:100',
+            'reward_value_usd' => 'required|numeric|min:0|max:500',
+            'expires_at' => 'nullable|date',
+        ]);
+
+        $challenge = SeasonalChallenge::create([
+            'code' => Str::slug($validated['title']) . '-' . strtolower(Str::random(4)),
+            'title' => $validated['title'],
+            'description' => $validated['description'],
+            'icon' => ($validated['icon'] ?? '') ?: '🎄',
+            'period_type' => $validated['period_type'],
+            'action_type' => $validated['action_type'],
+            'target_count' => (int) $validated['target_count'],
+            'reward_value_usd' => round((float) $validated['reward_value_usd'], 4),
+            'expires_at' => $validated['expires_at'] ?? null,
+            'is_active' => true,
+        ]);
+
+        $admin = auth()->user();
+        $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'create_challenge', 'seasonal_challenge', $challenge->id, "Created Christmas challenge '{$challenge->title}'");
+
+        return back()->with('success', "Christmas challenge '{$challenge->title}' created!");
+    }
+
+    public function toggleChallenge(int $id)
+    {
+        $ch = SeasonalChallenge::findOrFail($id);
+        $ch->update(['is_active' => ! $ch->is_active]);
+
+        return back()->with('success', "Challenge '{$ch->title}' is now " . ($ch->is_active ? 'ACTIVE' : 'PAUSED') . '.');
+    }
+
+    public function destroyChallenge(int $id)
+    {
+        $ch = SeasonalChallenge::findOrFail($id);
+        $ch->delete();
+
+        return back()->with('success', 'Christmas challenge deleted.');
+    }
+
+    /**
+     * Create a new Seasonal Badge.
+     */
+    public function storeBadge(Request $request)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:120',
+            'description' => 'required|string|max:255',
+            'icon' => 'nullable|string|max:40',
+            'condition_type' => 'required|in:visit_hub,save_tree,save_snowman,claim_advent_1,claim_advent_5,explore_village,generate_card',
+            'condition_target' => 'nullable|integer|min:1|max:100',
+        ]);
+
+        SeasonalBadge::create([
+            'code' => Str::slug($validated['name']) . '-' . strtolower(Str::random(4)),
+            'name' => $validated['name'],
+            'description' => $validated['description'],
+            'icon' => ($validated['icon'] ?? '') ?: '🏅',
+            'condition_type' => $validated['condition_type'],
+            'condition_target' => (int) ($validated['condition_target'] ?? 1),
+            'is_active' => true,
+        ]);
+
+        return back()->with('success', "Seasonal badge '{$validated['name']}' created!");
+    }
+
+    public function toggleBadge(int $id)
+    {
+        $b = SeasonalBadge::findOrFail($id);
+        $b->update(['is_active' => ! $b->is_active]);
+
+        return back()->with('success', "Badge '{$b->name}' is now " . ($b->is_active ? 'ACTIVE' : 'PAUSED') . '.');
+    }
+
+    /**
+     * Update Interactive Christmas Feature Switches (Advent, Tree, Snowman, Village, Cards, Music, etc.).
+     */
+    public function updateInteractiveFeatures(Request $request)
+    {
+        $keys = [
+            'xmas_advent_enabled',
+            'xmas_tree_enabled',
+            'xmas_snowman_enabled',
+            'xmas_mystery_gifts_enabled',
+            'xmas_village_enabled',
+            'xmas_greeting_cards_enabled',
+            'xmas_badges_enabled',
+            'xmas_challenges_enabled',
+            'xmas_popups_enabled',
+            'xmas_music_enabled',
+        ];
+
+        foreach ($keys as $k) {
+            SeasonalSetting::setVal($k, $request->boolean($k) ? '1' : '0');
+        }
+
+        $admin = auth()->user();
+        $this->engine->logAudit($admin?->id, $admin?->name ?? 'Admin', 'update_interactive_features', 'seasonal_setting', null, 'Updated interactive Christmas feature toggles');
+        $this->engine->clearCache();
+
+        return back()->with('success', 'Interactive Christmas features & music settings updated!');
     }
 
     /**

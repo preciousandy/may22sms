@@ -159,6 +159,21 @@
                 class="px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition cursor-pointer">
             📜 4. Claim Ledger & Audit Logs
         </button>
+        <button type="button" @click="activeTab = 'advent'"
+                :class="activeTab === 'advent' ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
+                class="px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition cursor-pointer">
+            🗓️ 5. Advent Calendar (25 Days)
+        </button>
+        <button type="button" @click="activeTab = 'challenges'"
+                :class="activeTab === 'challenges' ? 'bg-amber-500 text-slate-950 shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
+                class="px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition cursor-pointer">
+            🎯 6. Challenges & Badges
+        </button>
+        <button type="button" @click="activeTab = 'interactive'"
+                :class="activeTab === 'interactive' ? 'bg-emerald-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'"
+                class="px-4 py-2.5 rounded-xl font-extrabold text-xs uppercase tracking-wider transition cursor-pointer">
+            ⛄ 7. Tree, Snowman, Village & Music
+        </button>
     </div>
 
     <!-- ==========================================
@@ -530,6 +545,279 @@
                 @endforelse
             </div>
         </div>
+    </div>
+
+    <!-- ==========================================
+         TAB 5: 25-DAY CHRISTMAS ADVENT CALENDAR ADMIN
+         ========================================== -->
+    <div x-show="activeTab === 'advent'" style="display: none;" class="space-y-4">
+        <div class="bg-white rounded-2xl p-5 border border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+                <h3 class="text-base font-black text-gray-900">🗓️ 25-Day Christmas Advent Calendar Configuration</h3>
+                <p class="text-xs text-gray-500">Configure each day's title, reward type, USD amount, discount code, and unlock status.</p>
+            </div>
+            <a href="/christmas-wonderland" target="_blank" class="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-black text-xs transition shrink-0">
+                👁️ Preview User Christmas Hub &rarr;
+            </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            @foreach(($adventDays ?? collect()) as $day)
+                <form action="{{ route('admin.seasonal.advent.update', $day->id) }}" method="POST"
+                      class="bg-white rounded-2xl border border-gray-200 p-4 space-y-3 text-xs shadow-xs">
+                    @csrf
+                    <div class="flex items-center justify-between border-b border-gray-100 pb-2.5">
+                        <span class="px-2.5 py-1 rounded-full bg-red-600 text-white font-black text-xs">
+                            Day {{ $day->day_number }}
+                        </span>
+                        <span class="text-[11px] font-bold text-gray-400">
+                            Claimed: <strong class="text-emerald-600">{{ number_format($day->claimed_count) }}</strong>
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-4 gap-2">
+                        <div class="col-span-3">
+                            <label class="font-bold text-gray-600 block mb-1">Box Title</label>
+                            <input type="text" name="title" value="{{ $day->title }}" required class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5 font-semibold">
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Icon</label>
+                            <input type="text" name="icon" value="{{ $day->icon }}" class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5 text-center">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="font-bold text-gray-600 block mb-1">Description</label>
+                        <input type="text" name="description" value="{{ $day->description }}" class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Reward Type</label>
+                            <select name="reward_type" class="w-full rounded-xl border border-gray-300 px-2 py-1.5 font-semibold">
+                                @foreach(['wallet_credit' => 'Wallet Credit', 'sms_credit' => 'SMS Credit', 'boosting_credit' => 'Boost Credit', 'discount_coupon' => 'Discount %', 'promo_code' => 'Promo Code'] as $rtK => $rtL)
+                                    <option value="{{ $rtK }}" {{ $day->reward_type === $rtK ? 'selected' : '' }}>{{ $rtL }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-600 block mb-1">Value (USD)</label>
+                            <input type="number" step="0.01" min="0" name="reward_value_usd" value="{{ $day->reward_value_usd }}" class="w-full rounded-xl border border-gray-300 px-2.5 py-1.5 font-bold">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between pt-2 border-t border-gray-100">
+                        <div class="flex items-center gap-3">
+                            <label class="inline-flex items-center gap-1.5 font-bold text-gray-700 cursor-pointer">
+                                <input type="checkbox" name="is_enabled" value="1" {{ $day->is_enabled ? 'checked' : '' }} class="rounded text-[#0d9488]">
+                                <span>Enabled</span>
+                            </label>
+                            <label class="inline-flex items-center gap-1.5 font-bold text-amber-700 cursor-pointer" title="Allow users to unwrap even before December {{ $day->day_number }}">
+                                <input type="checkbox" name="force_unlocked" value="1" {{ $day->force_unlocked ? 'checked' : '' }} class="rounded text-amber-500">
+                                <span>Force Unlock</span>
+                            </label>
+                        </div>
+                        <button type="submit" class="px-3 py-1.5 rounded-xl bg-[#0d9488] hover:bg-teal-700 text-white font-black text-xs cursor-pointer">
+                            Save Day {{ $day->day_number }}
+                        </button>
+                    </div>
+                </form>
+            @endforeach
+        </div>
+    </div>
+
+    <!-- ==========================================
+         TAB 6: CHRISTMAS CHALLENGES & SEASONAL BADGES
+         ========================================== -->
+    <div x-show="activeTab === 'challenges'" style="display: none;" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Left: Christmas Challenges Management -->
+        <div class="space-y-4">
+            <div class="bg-white rounded-3xl p-5 border border-gray-200 space-y-4">
+                <h3 class="text-base font-black text-gray-900">🎯 Create Christmas Challenge</h3>
+                <form action="{{ route('admin.seasonal.challenges.store') }}" method="POST" class="space-y-3 text-xs">
+                    @csrf
+                    <div class="grid grid-cols-4 gap-2">
+                        <div class="col-span-3">
+                            <label class="font-bold text-gray-700 block mb-1">Challenge Title *</label>
+                            <input type="text" name="title" required placeholder="e.g. Decorate Your Christmas Tree" class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Icon</label>
+                            <input type="text" name="icon" value="🎄" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-center">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-bold text-gray-700 block mb-1">Description *</label>
+                        <input type="text" name="description" required placeholder="Place ornaments on your tree and save it." class="w-full rounded-xl border border-gray-300 px-3 py-2">
+                    </div>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Period</label>
+                            <select name="period_type" class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-semibold">
+                                <option value="daily">Daily</option>
+                                <option value="weekly">Weekly</option>
+                                <option value="seasonal">Seasonal</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Trigger Action</label>
+                            <select name="action_type" class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-semibold">
+                                <option value="visit_christmas_hub">Visit Christmas Hub</option>
+                                <option value="claim_advent_day">Claim Advent Box</option>
+                                <option value="decorate_tree">Decorate Tree</option>
+                                <option value="build_snowman">Build Snowman</option>
+                                <option value="explore_village">Explore Village</option>
+                                <option value="generate_greeting_card">Create Greeting Card</option>
+                                <option value="complete_profile">Complete Profile</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Target Count</label>
+                            <input type="number" min="1" name="target_count" value="1" required class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-bold">
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Reward (USD)</label>
+                            <input type="number" step="0.01" min="0" name="reward_value_usd" value="0.05" required class="w-full rounded-xl border border-gray-300 px-2.5 py-2 font-bold">
+                        </div>
+                    </div>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#0d9488] hover:bg-teal-700 text-white font-black text-xs cursor-pointer">
+                        + Add Christmas Challenge
+                    </button>
+                </form>
+            </div>
+
+            <div class="space-y-2.5">
+                @foreach(($challenges ?? collect()) as $ch)
+                    <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center justify-between gap-3 text-xs">
+                        <div>
+                            <div class="font-black text-gray-900">
+                                {{ $ch->icon }} {{ $ch->title }}
+                                <span class="ml-1 px-2 py-0.5 rounded-full text-[10px] uppercase {{ $ch->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500' }}">
+                                    {{ $ch->is_active ? 'Active' : 'Paused' }}
+                                </span>
+                            </div>
+                            <p class="text-gray-500 mt-0.5">{{ $ch->description }} &bull; Reward: <strong class="text-[#0d9488]">${{ number_format($ch->reward_value_usd, 2) }}</strong></p>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <form action="{{ route('admin.seasonal.challenges.toggle', $ch->id) }}" method="POST">
+                                @csrf
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 font-bold cursor-pointer">
+                                    {{ $ch->is_active ? 'Pause' : 'Enable' }}
+                                </button>
+                            </form>
+                            <form action="{{ route('admin.seasonal.challenges.destroy', $ch->id) }}" method="POST" onsubmit="return confirm('Delete this challenge?');">
+                                @csrf
+                                @method('DELETE')
+                                <button type="submit" class="px-2.5 py-1.5 rounded-lg text-rose-600 hover:bg-rose-50 font-bold cursor-pointer">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+
+        <!-- Right: Seasonal Achievement Badges Management -->
+        <div class="space-y-4">
+            <div class="bg-white rounded-3xl p-5 border border-gray-200 space-y-4">
+                <h3 class="text-base font-black text-gray-900">🏅 Create Seasonal Achievement Badge</h3>
+                <form action="{{ route('admin.seasonal.badges.store') }}" method="POST" class="space-y-3 text-xs">
+                    @csrf
+                    <div class="grid grid-cols-4 gap-2">
+                        <div class="col-span-3">
+                            <label class="font-bold text-gray-700 block mb-1">Badge Name *</label>
+                            <input type="text" name="name" required placeholder="e.g. Winter VIP Champion" class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                        </div>
+                        <div>
+                            <label class="font-bold text-gray-700 block mb-1">Emoji</label>
+                            <input type="text" name="icon" value="🏅" class="w-full rounded-xl border border-gray-300 px-3 py-2 text-center">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="font-bold text-gray-700 block mb-1">Unlock Condition</label>
+                        <select name="condition_type" class="w-full rounded-xl border border-gray-300 px-3 py-2 font-semibold">
+                            <option value="visit_hub">Visit Christmas Wonderland Hub</option>
+                            <option value="save_tree">Decorate & Save Christmas Tree</option>
+                            <option value="save_snowman">Build & Save Snowman</option>
+                            <option value="claim_advent_1">Unwrap 1st Advent Box</option>
+                            <option value="claim_advent_5">Unwrap 5 Advent Boxes</option>
+                            <option value="explore_village">Explore Christmas Village</option>
+                            <option value="generate_card">Create Christmas Greeting Card</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="font-bold text-gray-700 block mb-1">Badge Description *</label>
+                        <input type="text" name="description" required placeholder="Awarded for celebrating Christmas on MAY22SMS" class="w-full rounded-xl border border-gray-300 px-3 py-2">
+                    </div>
+                    <button type="submit" class="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs cursor-pointer">
+                        + Create Seasonal Badge
+                    </button>
+                </form>
+            </div>
+
+            <div class="space-y-2.5">
+                @foreach(($badges ?? collect()) as $b)
+                    <div class="bg-white rounded-2xl border border-gray-200 p-4 flex items-center justify-between gap-3 text-xs">
+                        <div class="flex items-center gap-3">
+                            <span class="text-2xl">{{ $b->icon }}</span>
+                            <div>
+                                <div class="font-black text-gray-900">{{ $b->name }}</div>
+                                <div class="text-gray-500">{{ $b->description }}</div>
+                            </div>
+                        </div>
+                        <form action="{{ route('admin.seasonal.badges.toggle', $b->id) }}" method="POST">
+                            @csrf
+                            <button type="submit" class="px-3 py-1.5 rounded-lg {{ $b->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-500' }} font-bold cursor-pointer">
+                                {{ $b->is_active ? 'Active' : 'Disabled' }}
+                            </button>
+                        </form>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    </div>
+
+    <!-- ==========================================
+         TAB 7: INTERACTIVE FEATURES & MUSIC SWITCHBOARD
+         ========================================== -->
+    <div x-show="activeTab === 'interactive'" style="display: none;" class="bg-white rounded-3xl p-6 sm:p-8 border border-gray-200 shadow-xs space-y-6">
+        <div>
+            <h3 class="text-lg font-black text-gray-900">⛄ Interactive Christmas Modules & Music Control Center</h3>
+            <p class="text-xs text-gray-500 mt-1">Enable or disable individual interactive experiences inside the user Christmas Wonderland Hub without turning off the main Christmas Mode.</p>
+        </div>
+
+        <form action="{{ route('admin.seasonal.interactive.update') }}" method="POST" class="space-y-5">
+            @csrf
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                @foreach([
+                    'xmas_advent_enabled' => ['🗓️ 25-Day Advent Calendar', 'Daily numbered Christmas gift boxes with automated unlock schedule.'],
+                    'xmas_tree_enabled' => ['🎄 Interactive Christmas Tree', 'Allow users to decorate and save their personal evergreen tree.'],
+                    'xmas_snowman_enabled' => ['⛄ Snowman Builder & Avatar', 'Allow users to build a snowman displayed on their festive profile card.'],
+                    'xmas_village_enabled' => ['🏘️ Animated Christmas Village', 'Interactive glowing winter cottages, trees, and discovery tips.'],
+                    'xmas_greeting_cards_enabled' => ['💌 Greeting Card Generator', 'Personalized MAY22SMS holiday cards with PNG download & WhatsApp share.'],
+                    'xmas_mystery_gifts_enabled' => ['🎁 Festive Gift Boxes Section', 'Predefined transparent seasonal gift boxes inside the Wonderland Hub.'],
+                    'xmas_challenges_enabled' => ['🎯 Christmas Challenge Board', 'Daily & weekly festive activities with bonus wallet credit rewards.'],
+                    'xmas_badges_enabled' => ['🏅 Seasonal Achievements & Badges', 'Unlockable holiday badges displayed on user profiles.'],
+                    'xmas_popups_enabled' => ['✨ Festive Toast Pop-Ups', 'Non-intrusive celebration toast alerts when gifts or badges unlock.'],
+                    'xmas_music_enabled' => ['🎵 Optional Carol Chimes & SFX', 'Opt-in WebAudio Christmas chimes and gift-unwrapping sound effects.'],
+                ] as $fKey => $fMeta)
+                    <label class="rounded-2xl border border-gray-200 p-4 flex items-start gap-3 cursor-pointer hover:border-[#0d9488] transition">
+                        <input type="checkbox" name="{{ $fKey }}" value="1"
+                               {{ ($featureSettings[$fKey] ?? true) ? 'checked' : '' }}
+                               class="mt-1 h-4 w-4 rounded text-[#0d9488]">
+                        <div>
+                            <div class="font-black text-gray-900 text-sm">{{ $fMeta[0] }}</div>
+                            <p class="text-gray-500 text-[11px] mt-0.5">{{ $fMeta[1] }}</p>
+                        </div>
+                    </label>
+                @endforeach
+            </div>
+
+            <div class="pt-4 border-t border-gray-100 flex items-center justify-end">
+                <button type="submit" class="px-6 py-3 rounded-xl bg-[#0d9488] hover:bg-teal-700 text-white font-black text-xs shadow-md cursor-pointer">
+                    💾 Save Interactive Feature Switches
+                </button>
+            </div>
+        </form>
     </div>
 
     <!-- ======================================================

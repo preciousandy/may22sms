@@ -104,7 +104,11 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::post('/api/daily-gift/claim', [\App\Http\Controllers\User\DailyGiftController::class, 'claim']);
 
     // Seasonal Celebrations & User Gift Claiming
+    Route::get('/christmas-wonderland', [\App\Http\Controllers\User\SeasonalController::class, 'christmasHub'])->name('seasonal.christmas.hub');
     Route::post('/api/seasonal/gifts/{id}/claim', [\App\Http\Controllers\User\SeasonalController::class, 'claimGift'])->name('seasonal.gifts.claim');
+    Route::post('/api/seasonal/advent/{day}/claim', [\App\Http\Controllers\User\SeasonalController::class, 'claimAdventDay'])->name('seasonal.advent.claim');
+    Route::post('/api/seasonal/creations/save', [\App\Http\Controllers\User\SeasonalController::class, 'saveCreation'])->name('seasonal.creations.save');
+    Route::post('/api/seasonal/challenges/{id}/claim', [\App\Http\Controllers\User\SeasonalController::class, 'claimChallenge'])->name('seasonal.challenges.claim');
     Route::post('/api/seasonal/preferences/animations', [\App\Http\Controllers\User\SeasonalController::class, 'toggleAnimations'])->name('seasonal.preferences.animations');
     Route::post('/api/seasonal/announcements/{id}/dismiss', [\App\Http\Controllers\User\SeasonalController::class, 'dismissAnnouncement'])->name('seasonal.announcements.dismiss');
     Route::get('/api/seasonal/claims/history', [\App\Http\Controllers\User\SeasonalController::class, 'history'])->name('seasonal.claims.history');
@@ -438,6 +442,15 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::post('/seasonal/announcements/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleAnnouncement'])->name('admin.seasonal.announcements.toggle');
     Route::post('/seasonal/announcements/{id}/broadcast', [\App\Http\Controllers\Admin\SeasonalController::class, 'broadcastAnnouncement'])->name('admin.seasonal.announcements.broadcast');
     Route::delete('/seasonal/announcements/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'destroyAnnouncement'])->name('admin.seasonal.announcements.destroy');
+
+    // Interactive Christmas Admin Endpoints (Advent Calendar, Challenges, Badges & Feature Toggles)
+    Route::post('/seasonal/advent/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'updateAdventDay'])->name('admin.seasonal.advent.update');
+    Route::post('/seasonal/challenges', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeChallenge'])->name('admin.seasonal.challenges.store');
+    Route::post('/seasonal/challenges/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleChallenge'])->name('admin.seasonal.challenges.toggle');
+    Route::delete('/seasonal/challenges/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'destroyChallenge'])->name('admin.seasonal.challenges.destroy');
+    Route::post('/seasonal/badges', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeBadge'])->name('admin.seasonal.badges.store');
+    Route::post('/seasonal/badges/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleBadge'])->name('admin.seasonal.badges.toggle');
+    Route::post('/seasonal/interactive-features', [\App\Http\Controllers\Admin\SeasonalController::class, 'updateInteractiveFeatures'])->name('admin.seasonal.interactive.update');
 });
 
 // Quidax Webhook Endpoints

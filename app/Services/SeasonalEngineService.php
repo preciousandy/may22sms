@@ -6,12 +6,19 @@ use App\Models\BoostOrder;
 use App\Models\FundingTransaction;
 use App\Models\LogOrder;
 use App\Models\PromoCode;
+use App\Models\SeasonalAdventClaim;
+use App\Models\SeasonalAdventDay;
 use App\Models\SeasonalAnnouncement;
 use App\Models\SeasonalAuditLog;
+use App\Models\SeasonalBadge;
+use App\Models\SeasonalChallenge;
 use App\Models\SeasonalGift;
 use App\Models\SeasonalGiftClaim;
 use App\Models\SeasonalMode;
 use App\Models\SeasonalSetting;
+use App\Models\SeasonalUserBadge;
+use App\Models\SeasonalUserChallenge;
+use App\Models\SeasonalUserCreation;
 use App\Models\SeasonalUserPreference;
 use App\Models\SmsOrder;
 use App\Models\User;
@@ -1081,6 +1088,494 @@ class SeasonalEngineService
             'total_reward_value_usd' => round($totalRewardValueUsd, 4),
             'remaining_available_claims' => $remainingClaims,
         ];
+    }
+
+    /**
+     * Seed the 25-Day Advent Calendar, Festive Badges, Christmas Challenges, and Interactive Settings.
+     */
+    public function ensureInteractiveChristmasSeeded(): void
+    {
+        if (Schema::hasTable('seasonal_advent_days') && SeasonalAdventDay::count() === 0) {
+            $icons = ['🎁', '🎄', '❄️', '🔔', '⭐', '🦌', '🍪', '🧦', '🕯️', '🎅', '⛄', '🎀'];
+            $year = (int) now()->year;
+            for ($d = 1; $d <= 25; $d++) {
+                $isGrand = ($d === 25);
+                $isMilestone = ($d % 5 === 0);
+                $rewardVal = $isGrand ? 0.50 : ($isMilestone ? 0.15 : 0.04);
+                $rewardType = ($d === 10 || $d === 20) ? 'discount_coupon' : (($d % 3 === 0) ? 'sms_credit' : 'wallet_credit');
+
+                SeasonalAdventDay::create([
+                    'day_number' => $d,
+                    'title' => $isGrand ? 'Day 25: Grand Christmas Day Surprise! 🎅🎄' : "December Day {$d} Festive Box",
+                    'description' => $isGrand
+                        ? 'Merry Christmas! Unwrap our biggest Christmas Day wallet bonus!'
+                        : ($rewardType === 'discount_coupon' ? 'Special 15% Discount Coupon for your next order!' : 'Free festive bonus credit for MAY22SMS services!'),
+                    'icon' => $isGrand ? '🎅' : $icons[($d - 1) % count($icons)],
+                    'reward_type' => $rewardType,
+                    'reward_value_usd' => $rewardType === 'discount_coupon' ? 0.00 : $rewardVal,
+                    'promo_code' => $rewardType === 'discount_coupon' ? "XMASDAY{$d}" : null,
+                    'discount_percent' => $rewardType === 'discount_coupon' ? 15.0 : null,
+                    'unlock_date' => Carbon::create($year, 12, $d)->toDateString(),
+                    'force_unlocked' => $d <= 3, // Pre-unlock Days 1-3 so users can enjoy immediately upon activation
+                    'is_enabled' => true,
+                ]);
+            }
+        }
+
+        if (Schema::hasTable('seasonal_badges') && SeasonalBadge::count() === 0) {
+            $badges = [
+                [
+                    'code' => 'christmas_star',
+                    'name' => 'Christmas Star',
+                    'description' => 'Visited the MAY22SMS Interactive Christmas Wonderland!',
+                    'icon' => '🌟',
+                    'condition_type' => 'visit_hub',
+                    'condition_target' => 1,
+                ],
+                [
+                    'code' => 'christmas_tree_master',
+                    'name' => 'Christmas Tree Master',
+                    'description' => 'Decorated and saved your personal MAY22SMS Christmas Tree.',
+                    'icon' => '🎄',
+                    'condition_type' => 'save_tree',
+                    'condition_target' => 1,
+                ],
+                [
+                    'code' => 'snowman_architect',
+                    'name' => 'Frosty Snowman Builder',
+                    'description' => 'Built and customized your festive snowman on your profile card.',
+                    'icon' => '⛄',
+                    'condition_type' => 'save_snowman',
+                    'condition_target' => 1,
+                ],
+                [
+                    'code' => 'snow_explorer',
+                    'name' => 'Snow Village Explorer',
+                    'description' => 'Explored the animated MAY22SMS Christmas Village.',
+                    'icon' => '🏘️',
+                    'condition_type' => 'explore_village',
+                    'condition_target' => 1,
+                ],
+                [
+                    'code' => 'advent_opener',
+                    'name' => 'Advent Unwrapper',
+                    'description' => 'Unlocked and claimed your first Advent Calendar gift box.',
+                    'icon' => '🎁',
+                    'condition_type' => 'claim_advent_1',
+                    'condition_target' => 1,
+                ],
+                [
+                    'code' => 'advent_champion',
+                    'name' => 'Advent Calendar Champion',
+                    'description' => 'Claimed 5 or more Advent Calendar daily surprise boxes.',
+                    'icon' => '👑',
+                    'condition_type' => 'claim_advent_5',
+                    'condition_target' => 5,
+                ],
+                [
+                    'code' => 'holiday_champion',
+                    'name' => 'Holiday Greeting Creator',
+                    'description' => 'Created a personalized MAY22SMS Christmas Greeting Card.',
+                    'icon' => '💌',
+                    'condition_type' => 'generate_card',
+                    'condition_target' => 1,
+                ],
+            ];
+
+            foreach ($badges as $b) {
+                SeasonalBadge::create(array_merge($b, ['is_active' => true]));
+            }
+        }
+
+        if (Schema::hasTable('seasonal_challenges') && SeasonalChallenge::count() === 0) {
+            $challenges = [
+                [
+                    'code' => 'visit_christmas_hub',
+                    'title' => 'Visit the MAY22SMS Christmas Wonderland',
+                    'description' => 'Open the interactive Christmas Hub today to start celebrating.',
+                    'icon' => '🎄',
+                    'period_type' => 'daily',
+                    'action_type' => 'visit_christmas_hub',
+                    'target_count' => 1,
+                    'reward_value_usd' => 0.03,
+                ],
+                [
+                    'code' => 'decorate_christmas_tree',
+                    'title' => 'Decorate Your Personal Christmas Tree',
+                    'description' => 'Place ornaments, lights, and a star on your Christmas tree and save it.',
+                    'icon' => '🌟',
+                    'period_type' => 'seasonal',
+                    'action_type' => 'decorate_tree',
+                    'target_count' => 1,
+                    'reward_value_usd' => 0.05,
+                ],
+                [
+                    'code' => 'build_festive_snowman',
+                    'title' => 'Build & Save Your Snowman',
+                    'description' => 'Customize your snowman with a hat, scarf, and accessories.',
+                    'icon' => '⛄',
+                    'period_type' => 'seasonal',
+                    'action_type' => 'build_snowman',
+                    'target_count' => 1,
+                    'reward_value_usd' => 0.05,
+                ],
+                [
+                    'code' => 'open_advent_box',
+                    'title' => 'Unwrap an Advent Calendar Gift Box',
+                    'description' => 'Claim any unlocked day in the 25-Day Christmas Advent Calendar.',
+                    'icon' => '🎁',
+                    'period_type' => 'daily',
+                    'action_type' => 'claim_advent_day',
+                    'target_count' => 1,
+                    'reward_value_usd' => 0.04,
+                ],
+                [
+                    'code' => 'explore_christmas_village',
+                    'title' => 'Explore 3 Buildings in Christmas Village',
+                    'description' => 'Tap on the glowing cottages and trees in the interactive village.',
+                    'icon' => '🏘️',
+                    'period_type' => 'weekly',
+                    'action_type' => 'explore_village',
+                    'target_count' => 3,
+                    'reward_value_usd' => 0.05,
+                ],
+                [
+                    'code' => 'create_christmas_card',
+                    'title' => 'Create a Christmas Greeting Card',
+                    'description' => 'Design and save or download a festive MAY22SMS greeting card.',
+                    'icon' => '💌',
+                    'period_type' => 'weekly',
+                    'action_type' => 'generate_greeting_card',
+                    'target_count' => 1,
+                    'reward_value_usd' => 0.04,
+                ],
+            ];
+
+            foreach ($challenges as $c) {
+                SeasonalChallenge::create(array_merge($c, ['is_active' => true]));
+            }
+        }
+
+        if (Schema::hasTable('seasonal_settings') && SeasonalSetting::count() === 0) {
+            $defaults = [
+                'xmas_advent_enabled' => '1',
+                'xmas_tree_enabled' => '1',
+                'xmas_snowman_enabled' => '1',
+                'xmas_mystery_gifts_enabled' => '1',
+                'xmas_village_enabled' => '1',
+                'xmas_greeting_cards_enabled' => '1',
+                'xmas_badges_enabled' => '1',
+                'xmas_challenges_enabled' => '1',
+                'xmas_popups_enabled' => '1',
+                'xmas_music_enabled' => '1',
+            ];
+            foreach ($defaults as $k => $v) {
+                SeasonalSetting::setVal($k, $v);
+            }
+        }
+    }
+
+    /**
+     * Get all interactive Christmas feature toggles and custom catalogs.
+     */
+    public function getInteractiveFeatureSettings(): array
+    {
+        $defaults = [
+            'xmas_advent_enabled' => true,
+            'xmas_tree_enabled' => true,
+            'xmas_snowman_enabled' => true,
+            'xmas_mystery_gifts_enabled' => true,
+            'xmas_village_enabled' => true,
+            'xmas_greeting_cards_enabled' => true,
+            'xmas_badges_enabled' => true,
+            'xmas_challenges_enabled' => true,
+            'xmas_popups_enabled' => true,
+            'xmas_music_enabled' => true,
+        ];
+
+        if (! Schema::hasTable('seasonal_settings')) {
+            return $defaults;
+        }
+
+        $rows = SeasonalSetting::pluck('value', 'key')->toArray();
+        $out = [];
+        foreach ($defaults as $k => $def) {
+            $out[$k] = isset($rows[$k]) ? ((string) $rows[$k] === '1') : $def;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Claim a day from the 25-Day Christmas Advent Calendar atomically.
+     */
+    public function claimAdventDay(User $user, int $dayNumber): array
+    {
+        return DB::transaction(function () use ($user, $dayNumber) {
+            $day = SeasonalAdventDay::where('day_number', $dayNumber)->lockForUpdate()->firstOrFail();
+            $lockedUser = User::lockForUpdate()->findOrFail($user->id);
+
+            if (! $day->is_enabled) {
+                throw new RuntimeException("Day {$dayNumber} is currently disabled by admin.");
+            }
+
+            if (! $day->isUnlockedNow()) {
+                throw new RuntimeException("Day {$dayNumber} is still locked! Check back on December {$dayNumber}.");
+            }
+
+            $alreadyClaimed = SeasonalAdventClaim::where('day_number', $dayNumber)
+                ->where('user_id', $lockedUser->id)
+                ->lockForUpdate()
+                ->exists();
+
+            if ($alreadyClaimed) {
+                throw new RuntimeException("You have already unwrapped Day {$dayNumber} of the Advent Calendar!");
+            }
+
+            $rewardUsd = max(0.0, round((float) $day->reward_value_usd, 4));
+            $rewardCode = $day->promo_code;
+            $reference = "ADVENT-D{$dayNumber}-U{$lockedUser->id}-" . now()->year;
+
+            if (in_array($day->reward_type, ['wallet_credit', 'sms_credit', 'boosting_credit'], true) && $rewardUsd > 0) {
+                $this->walletService->credit(
+                    $lockedUser,
+                    $rewardUsd,
+                    'seasonal_advent',
+                    $reference,
+                    [
+                        'advent_day' => $dayNumber,
+                        'title' => $day->title,
+                        'reward_type' => $day->reward_type,
+                    ]
+                );
+            } elseif (in_array($day->reward_type, ['discount_coupon', 'promo_code'], true)) {
+                if (empty($rewardCode)) {
+                    $rewardCode = "ADVENT{$dayNumber}" . strtoupper(Str::random(4));
+                }
+                if (Schema::hasTable('promo_codes')) {
+                    PromoCode::firstOrCreate(
+                        ['code' => strtoupper($rewardCode)],
+                        [
+                            'title' => $day->title,
+                            'message' => $day->description ?: "Advent Calendar Day {$dayNumber} Coupon",
+                            'applies_to' => ['sms', 'logs', 'boost'],
+                            'type' => 'percent',
+                            'value' => $day->discount_percent > 0 ? (float) $day->discount_percent : 15.0,
+                            'max_uses' => 500,
+                            'used_count' => 0,
+                            'is_active' => true,
+                            'is_public' => false,
+                            'expires_at' => now()->addDays(14),
+                        ]
+                    );
+                }
+            }
+
+            $claim = SeasonalAdventClaim::create([
+                'advent_day_id' => $day->id,
+                'day_number' => $dayNumber,
+                'user_id' => $lockedUser->id,
+                'reward_type' => $day->reward_type,
+                'reward_value_usd' => $rewardUsd,
+                'reward_code' => $rewardCode,
+                'reference' => $reference,
+                'claimed_at' => now(),
+            ]);
+
+            $day->increment('claimed_count');
+
+            // Record challenge progress & unlock Advent badges
+            $this->recordActivityAndEvaluate($lockedUser, 'claim_advent_day');
+
+            $totalAdventClaims = SeasonalAdventClaim::where('user_id', $lockedUser->id)->count();
+            $earnedBadges = [];
+            if ($totalAdventClaims >= 1) {
+                if ($b1 = $this->awardBadgeByCondition($lockedUser, 'claim_advent_1')) {
+                    $earnedBadges[] = $b1;
+                }
+            }
+            if ($totalAdventClaims >= 5) {
+                if ($b5 = $this->awardBadgeByCondition($lockedUser, 'claim_advent_5')) {
+                    $earnedBadges[] = $b5;
+                }
+            }
+
+            $freshUser = User::find($lockedUser->id);
+
+            return [
+                'claim' => $claim,
+                'reward_usd' => $rewardUsd,
+                'reward_code' => $rewardCode,
+                'new_balance_usd' => (float) ($freshUser->walletBalance ?? 0),
+                'earned_badges' => $earnedBadges,
+                'message' => $rewardUsd > 0
+                    ? "🎄 Day {$dayNumber} Unwrapped! $" . number_format($rewardUsd, 2) . " USD has been added to your wallet!"
+                    : "🎄 Day {$dayNumber} Unwrapped! Your festive promo code is: {$rewardCode}",
+            ];
+        });
+    }
+
+    /**
+     * Record a user's seasonal activity, increment challenge progress, and award any matching badge.
+     */
+    public function recordActivityAndEvaluate(User $user, string $actionType): array
+    {
+        $earnedBadges = [];
+        $completedChallenges = [];
+
+        if (! Schema::hasTable('seasonal_challenges')) {
+            return ['earned_badges' => [], 'completed_challenges' => []];
+        }
+
+        // 1. Update matching challenges
+        $challenges = SeasonalChallenge::where('is_active', true)
+            ->where('action_type', $actionType)
+            ->get();
+
+        foreach ($challenges as $ch) {
+            if ($ch->expires_at && now()->gt($ch->expires_at)) {
+                continue;
+            }
+
+            $uc = SeasonalUserChallenge::firstOrCreate(
+                ['seasonal_challenge_id' => $ch->id, 'user_id' => $user->id],
+                ['progress_count' => 0, 'is_completed' => false, 'is_reward_claimed' => false]
+            );
+
+            if (! $uc->is_completed) {
+                $newProg = min($ch->target_count, $uc->progress_count + 1);
+                $isNowDone = ($newProg >= $ch->target_count);
+                $uc->update([
+                    'progress_count' => $newProg,
+                    'is_completed' => $isNowDone,
+                    'completed_at' => $isNowDone ? now() : null,
+                ]);
+                if ($isNowDone) {
+                    $completedChallenges[] = $ch->title;
+                }
+            }
+        }
+
+        // 2. Map actionType to badge conditionType
+        $badgeMap = [
+            'visit_christmas_hub' => 'visit_hub',
+            'decorate_tree' => 'save_tree',
+            'build_snowman' => 'save_snowman',
+            'explore_village' => 'explore_village',
+            'generate_greeting_card' => 'generate_card',
+        ];
+
+        if (isset($badgeMap[$actionType])) {
+            $awarded = $this->awardBadgeByCondition($user, $badgeMap[$actionType]);
+            if ($awarded) {
+                $earnedBadges[] = $awarded;
+            }
+        }
+
+        return [
+            'earned_badges' => $earnedBadges,
+            'completed_challenges' => $completedChallenges,
+        ];
+    }
+
+    /**
+     * Award a seasonal badge by condition_type if the user has not earned it yet.
+     */
+    public function awardBadgeByCondition(User $user, string $conditionType): ?array
+    {
+        if (! Schema::hasTable('seasonal_badges') || ! Schema::hasTable('seasonal_user_badges')) {
+            return null;
+        }
+
+        $badge = SeasonalBadge::where('condition_type', $conditionType)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $badge) {
+            return null;
+        }
+
+        $exists = SeasonalUserBadge::where('seasonal_badge_id', $badge->id)
+            ->where('user_id', $user->id)
+            ->exists();
+
+        if ($exists) {
+            return null;
+        }
+
+        SeasonalUserBadge::create([
+            'seasonal_badge_id' => $badge->id,
+            'user_id' => $user->id,
+            'earned_at' => now(),
+        ]);
+
+        $this->sendUserInAppNotification(
+            $user,
+            "🏅 New Christmas Badge Unlocked: {$badge->icon} {$badge->name}",
+            $badge->description,
+            '/christmas-wonderland'
+        );
+
+        return [
+            'id' => $badge->id,
+            'name' => $badge->name,
+            'icon' => $badge->icon,
+            'description' => $badge->description,
+        ];
+    }
+
+    /**
+     * Claim the wallet reward for a completed Christmas challenge atomically.
+     */
+    public function claimChallengeReward(User $user, int $challengeId): array
+    {
+        return DB::transaction(function () use ($user, $challengeId) {
+            $challenge = SeasonalChallenge::lockForUpdate()->findOrFail($challengeId);
+            $lockedUser = User::lockForUpdate()->findOrFail($user->id);
+
+            $uc = SeasonalUserChallenge::where('seasonal_challenge_id', $challenge->id)
+                ->where('user_id', $lockedUser->id)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $uc || ! $uc->is_completed) {
+                throw new RuntimeException('Complete this challenge first before claiming the reward!');
+            }
+
+            if ($uc->is_reward_claimed) {
+                throw new RuntimeException('You have already claimed the reward for this challenge!');
+            }
+
+            $rewardUsd = max(0.0, round((float) $challenge->reward_value_usd, 4));
+            $reference = "XMAS-CHAL-{$challenge->id}-U{$lockedUser->id}";
+
+            if ($rewardUsd > 0) {
+                $this->walletService->credit(
+                    $lockedUser,
+                    $rewardUsd,
+                    'seasonal_challenge',
+                    $reference,
+                    [
+                        'challenge_id' => $challenge->id,
+                        'challenge_title' => $challenge->title,
+                    ]
+                );
+            }
+
+            $uc->update([
+                'is_reward_claimed' => true,
+                'claim_reference' => $reference,
+                'claimed_at' => now(),
+            ]);
+
+            $freshUser = User::find($lockedUser->id);
+
+            return [
+                'reward_usd' => $rewardUsd,
+                'new_balance_usd' => (float) ($freshUser->walletBalance ?? 0),
+                'message' => "🎉 Challenge Reward Claimed! +$" . number_format($rewardUsd, 2) . " USD credited to your wallet!",
+            ];
+        });
     }
 }
 
