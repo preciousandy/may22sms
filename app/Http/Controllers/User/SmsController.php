@@ -118,7 +118,33 @@ class SmsController extends Controller
 
     public function index()
     {
-        $orders = auth()->user()->smsOrders()->latest()->paginate(10)->withQueryString();
+        $user = auth()->user();
+
+        // Auto-repair any recent RECEIVED orders whose code was truncated to 3 digits due to hyphenated OTPs (e.g. WhatsApp 780-123)
+        try {
+            $truncatedOrders = $user->smsOrders()
+                ->whereIn('status', ['RECEIVED', 'COMPLETED'])
+                ->whereNotNull('sms_code')
+                ->whereRaw('CHAR_LENGTH(sms_code) = 3')
+                ->latest()
+                ->limit(5)
+                ->get();
+
+            foreach ($truncatedOrders as $tOrder) {
+                $svc = $this->resolveSmsService($tOrder);
+                $statusData = $svc->checkSms($tOrder->order_id);
+                if (is_array($statusData)) {
+                    $repairedCode = $this->extractOtpCodeFromStatusData($statusData);
+                    if ($repairedCode !== null && strlen($repairedCode) >= 4) {
+                        $tOrder->update(['sms_code' => $repairedCode]);
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Non-blocking repair
+        }
+
+        $orders = $user->smsOrders()->latest()->paginate(10)->withQueryString();
         $countries = SmsCountry::where('is_active', true)->orderBy('name')->get();
 
         $herosmsEnabled = (int) (Setting::where('key', 'sms_provider_herosms_enabled')->value('value') ?? 1) === 1;
@@ -549,12 +575,84 @@ class SmsController extends Controller
         }
     }
 
+    /**
+     * Extract full OTP code (including hyphenated/spaced 6-8 digit codes like WhatsApp "780-456" -> "780456").
+     */
+    private function extractOtpCode(?string $raw): ?string
+    {
+        $raw = trim((string) $raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        // 1. Match hyphenated or space-separated 6-8 digit OTP codes (e.g. WhatsApp "780-456" or "780 456")
+        if (preg_match('/(?<!\d)(\d{3,4})[-\s](\d{3,4})(?!\d)/', $raw, $m)) {
+            return $m[1] . $m[2];
+        }
+
+        // 2. Match contiguous 4-8 digit OTP codes
+        if (preg_match('/(?<!\d)(\d{4,8})(?!\d)/', $raw, $m)) {
+            return $m[1];
+        }
+
+        // 3. Fallback to 3-8 digits
+        if (preg_match('/(\d{3,8})/', $raw, $m)) {
+            return $m[1];
+        }
+
+        return $raw;
+    }
+
+    private function extractOtpCodeFromStatusData(array $statusData): ?string
+    {
+        $sms = $statusData['sms'] ?? null;
+        $extractedCode = null;
+
+        if (is_array($sms) && ! empty($sms)) {
+            $first = $sms[0] ?? [];
+            $textCandidate = (string) ($first['text'] ?? '');
+            $codeCandidate = (string) ($first['code'] ?? '');
+
+            // Check full text first if codeCandidate was truncated to 3 digits
+            if ($codeCandidate !== '') {
+                $extractedCode = $this->extractOtpCode($codeCandidate);
+            }
+            if ($textCandidate !== '') {
+                $fromText = $this->extractOtpCode($textCandidate);
+                if ($extractedCode === null || (strlen($extractedCode) <= 3 && $fromText !== null && strlen($fromText) > strlen($extractedCode))) {
+                    $extractedCode = $fromText;
+                }
+            }
+        }
+
+        if ($extractedCode === null && ! empty($statusData['sms_code'])) {
+            $extractedCode = $this->extractOtpCode((string) $statusData['sms_code']);
+        }
+
+        return $extractedCode;
+    }
+
     public function checkSms(Request $request, $id)
     {
         $order = SmsOrder::where('id', $id)->where('user_id', auth()->id())->firstOrFail();
 
         $isTerminal = in_array(strtoupper($order->status), ['RECEIVED', 'COMPLETED', 'CANCELED', 'CANCELLED', 'TIMEOUT', 'REFUNDED'], true);
         if ($isTerminal) {
+            // If order was marked RECEIVED with a truncated 3-digit code (e.g. 780 from 780-456), try re-fetching the full 6-digit code
+            if (in_array(strtoupper($order->status), ['RECEIVED', 'COMPLETED'], true) && strlen((string) $order->sms_code) === 3) {
+                try {
+                    $svc = $this->resolveSmsService($order);
+                    $freshData = $svc->checkSms($order->order_id);
+                    if (is_array($freshData)) {
+                        $repaired = $this->extractOtpCodeFromStatusData($freshData);
+                        if ($repaired !== null && strlen($repaired) >= 4) {
+                            $order->sms_code = $repaired;
+                            $order->save();
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+
             $canonicalStatus = (strtoupper($order->status) === 'COMPLETED' || strtoupper($order->status) === 'RECEIVED') ? 'RECEIVED' : (strtoupper($order->status) === 'CANCELLED' ? 'CANCELED' : strtoupper($order->status));
 
             if ($request->wantsJson()) {
@@ -581,28 +679,7 @@ class SmsController extends Controller
         $newStatus = strtoupper((string) ($statusData['status'] ?? ''));
 
         if ($newStatus === 'FINISHED' || $newStatus === 'RECEIVED') {
-            $sms = $statusData['sms'] ?? null;
-            $extractedCode = null;
-
-            if (is_array($sms) && ! empty($sms)) {
-                $first = $sms[0] ?? [];
-                $codeCandidate = $first['code'] ?? $first['text'] ?? null;
-                if (is_string($codeCandidate) && $codeCandidate !== '') {
-                    if (preg_match('/(\d{3,8})/', $codeCandidate, $m)) {
-                        $extractedCode = $m[1];
-                    } else {
-                        $extractedCode = trim($codeCandidate);
-                    }
-                }
-            }
-
-            if ($extractedCode === null && ! empty($statusData['sms_code'])) {
-                if (preg_match('/(\d{3,8})/', (string) $statusData['sms_code'], $m2)) {
-                    $extractedCode = $m2[1];
-                } else {
-                    $extractedCode = trim((string) $statusData['sms_code']);
-                }
-            }
+            $extractedCode = $this->extractOtpCodeFromStatusData($statusData);
 
             if ($extractedCode === null) {
                 Log::warning("SMS order {$order->id} reported RECEIVED but no code extracted", ['statusData' => $statusData]);

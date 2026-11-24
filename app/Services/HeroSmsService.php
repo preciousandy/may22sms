@@ -793,25 +793,22 @@ class HeroSmsService
                     $rest = str_contains($body, ':') ? explode(':', $body, 2)[1] : '';
                     $rest = trim($rest);
 
-                    $extractedCode = null;
-                    if (preg_match('/(\d{3,8})/', $rest, $m)) {
-                        $extractedCode = $m[1];
-                    } elseif ($rest !== '') {
-                        $extractedCode = $rest;
-                    }
-
+                    $extractedCode = $this->extractOtpFromText($rest);
                     if ($extractedCode === null && $text !== '') {
-                        if (preg_match('/(\d{3,8})/', $text, $m2)) {
-                            $extractedCode = $m2[1];
-                        } else {
-                            $extractedCode = $text;
+                        $extractedCode = $this->extractOtpFromText($text);
+                    }
+                    // If $rest only gave 3 digits (e.g. truncated before hyphen) and $text has full 6 digits, prefer $text
+                    if ($extractedCode !== null && strlen($extractedCode) <= 3 && $text !== '') {
+                        $fromText = $this->extractOtpFromText($text);
+                        if ($fromText !== null && strlen($fromText) > strlen($extractedCode)) {
+                            $extractedCode = $fromText;
                         }
                     }
 
                     $result = [
                         'status' => 'RECEIVED',
                         'sms' => [
-                            ['code' => $extractedCode ?? '', 'text' => $text !== '' ? $text : $rest]
+                            ['code' => $extractedCode ?? $rest, 'text' => $text !== '' ? $text : $rest]
                         ]
                     ];
                     break;
@@ -837,6 +834,35 @@ class HeroSmsService
         }
 
         return $result;
+    }
+
+    /**
+     * Extract full OTP code from raw provider response or SMS body.
+     * Supports hyphenated/spaced codes like WhatsApp "780-456" -> "780456" as well as standard 4-8 digit codes.
+     */
+    public function extractOtpFromText(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        // 1. Match hyphenated or space-separated 6-8 digit OTP codes (e.g. WhatsApp "780-456" or "123 456")
+        if (preg_match('/(?<!\d)(\d{3,4})[-\s](\d{3,4})(?!\d)/', $raw, $m)) {
+            return $m[1] . $m[2];
+        }
+
+        // 2. Match contiguous 4-8 digit OTP codes first (so 6-digit codes are preferred over 3-digit prefixes)
+        if (preg_match('/(?<!\d)(\d{4,8})(?!\d)/', $raw, $m)) {
+            return $m[1];
+        }
+
+        // 3. Fallback to 3-8 digits
+        if (preg_match('/(\d{3,8})/', $raw, $m)) {
+            return $m[1];
+        }
+
+        return $raw;
     }
 
     public function cancelOrder(string $orderId): array

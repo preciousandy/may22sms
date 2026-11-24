@@ -392,25 +392,21 @@ class DaisySmsService
                     $rest = str_contains($body, ':') ? explode(':', $body, 2)[1] : '';
                     $rest = trim($rest);
 
-                    $extractedCode = null;
-                    if (preg_match('/(\d{3,8})/', $rest, $m)) {
-                        $extractedCode = $m[1];
-                    } elseif ($rest !== '') {
-                        $extractedCode = $rest;
-                    }
-
+                    $extractedCode = $this->extractOtpFromText($rest);
                     if ($extractedCode === null && $text !== '') {
-                        if (preg_match('/(\d{3,8})/', $text, $m2)) {
-                            $extractedCode = $m2[1];
-                        } else {
-                            $extractedCode = $text;
+                        $extractedCode = $this->extractOtpFromText($text);
+                    }
+                    if ($extractedCode !== null && strlen($extractedCode) <= 3 && $text !== '') {
+                        $fromText = $this->extractOtpFromText($text);
+                        if ($fromText !== null && strlen($fromText) > strlen($extractedCode)) {
+                            $extractedCode = $fromText;
                         }
                     }
 
                     $result = [
                         'status' => 'RECEIVED',
                         'sms' => [
-                            ['code' => $extractedCode ?? '', 'text' => $text !== '' ? $text : $rest]
+                            ['code' => $extractedCode ?? $rest, 'text' => $text !== '' ? $text : $rest]
                         ]
                     ];
                     break;
@@ -436,6 +432,32 @@ class DaisySmsService
         }
 
         return $result;
+    }
+
+    /**
+     * Extract full OTP code from raw provider response or SMS body.
+     * Supports hyphenated/spaced codes like WhatsApp "780-456" -> "780456" as well as standard 4-8 digit codes.
+     */
+    public function extractOtpFromText(string $raw): ?string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return null;
+        }
+
+        if (preg_match('/(?<!\d)(\d{3,4})[-\s](\d{3,4})(?!\d)/', $raw, $m)) {
+            return $m[1] . $m[2];
+        }
+
+        if (preg_match('/(?<!\d)(\d{4,8})(?!\d)/', $raw, $m)) {
+            return $m[1];
+        }
+
+        if (preg_match('/(\d{3,8})/', $raw, $m)) {
+            return $m[1];
+        }
+
+        return $raw;
     }
 
     /**
