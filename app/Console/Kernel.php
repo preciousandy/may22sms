@@ -16,6 +16,7 @@ class Kernel extends ConsoleKernel
         $schedule->command('app:sync-football-matches --days=7')->daily()->withoutOverlapping();
         $schedule->command('savings:accrue-interest')->dailyAt('00:05')->withoutOverlapping();
         $schedule->command('savings:process-maturity')->dailyAt('00:15')->withoutOverlapping();
+        $schedule->command('seasonal:sync-schedule')->everyMinute()->withoutOverlapping();
     }
 
     /**

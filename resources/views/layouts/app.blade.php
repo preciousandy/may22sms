@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -301,11 +301,12 @@
     <!-- Instant Theme Initializer (Prevents Flash of Wrong Theme + Global Toggle API) -->
     <script>
         (function () {
+            var STORAGE_KEY = 'may22_theme_v2';
             function getSavedTheme() {
                 try {
-                    return localStorage.getItem('may22_theme') || 'light';
+                    return localStorage.getItem(STORAGE_KEY) || 'dark';
                 } catch (e) {
-                    return 'light';
+                    return 'dark';
                 }
             }
             function applyTheme(theme) {
@@ -323,7 +324,7 @@
             window.toggleSiteTheme = function () {
                 var next = document.documentElement.classList.contains('dark') ? 'light' : 'dark';
                 try {
-                    localStorage.setItem('may22_theme', next);
+                    localStorage.setItem(STORAGE_KEY, next);
                 } catch (e) {}
                 applyTheme(next);
                 return next;
@@ -484,6 +485,9 @@
     </div>
     <!-- Live Activity Social Proof Toast -->
     <x-live-activity-toast />
+
+    <!-- Global Seasonal Celebration Animations & Decorations Overlay -->
+    <x-seasonal-overlay />
 
     @auth
         <!-- Glassmorphism Review Modal -->

@@ -354,6 +354,14 @@ x-init="
                         <svg class="w-4 h-4 mr-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/></svg>
                         Service Controls
                     </a>
+
+                    <a href="/admin/seasonal" class="flex items-center justify-between px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/seasonal') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">
+                        <span class="flex items-center">
+                            <span class="mr-3 text-base leading-none">🎄</span>
+                            <span>Seasonal &amp; Gifts</span>
+                        </span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-amber-400 text-gray-950">NEW</span>
+                    </a>
                 @endif
 
                 <a href="/admin/mail" class="flex items-center px-4 py-3 rounded-xl font-bold text-xs uppercase tracking-wider transition {{ $isActive('admin/mail') ? 'bg-[#0d9488] text-white shadow-lg shadow-teal-900/30' : 'text-gray-300 hover:bg-gray-800 hover:text-white' }}">

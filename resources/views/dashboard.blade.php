@@ -31,6 +31,9 @@
 
 <div class="space-y-6">
 
+    <!-- 0. Seasonal Celebration Greeting Banner, Countdown & Claimable User Gifts -->
+    <x-seasonal-dashboard-hub />
+
     <!-- 1. OPay Signature Emerald / Teal Wallet Balance Hero Card -->
     <div x-data="{ 
             showBalance: localStorage.getItem('opay_show_balance') !== 'false',

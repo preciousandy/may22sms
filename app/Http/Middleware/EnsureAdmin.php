@@ -50,7 +50,7 @@ class EnsureAdmin
             $required = 'funding';
         } elseif ($request->is('admin/tickets*')) {
             $required = 'tickets';
-        } elseif ($request->is('admin/settings*') || $request->is('admin/services*')) {
+        } elseif ($request->is('admin/settings*') || $request->is('admin/services*') || $request->is('admin/seasonal*')) {
             $required = 'settings';
         } elseif ($request->is('admin/promo-codes*')) {
             $required = 'promos';

@@ -103,6 +103,12 @@ Route::middleware(['auth', CheckAccountStatus::class])->group(function () {
     Route::get('/api/daily-gift/status', [\App\Http\Controllers\User\DailyGiftController::class, 'status']);
     Route::post('/api/daily-gift/claim', [\App\Http\Controllers\User\DailyGiftController::class, 'claim']);
 
+    // Seasonal Celebrations & User Gift Claiming
+    Route::post('/api/seasonal/gifts/{id}/claim', [\App\Http\Controllers\User\SeasonalController::class, 'claimGift'])->name('seasonal.gifts.claim');
+    Route::post('/api/seasonal/preferences/animations', [\App\Http\Controllers\User\SeasonalController::class, 'toggleAnimations'])->name('seasonal.preferences.animations');
+    Route::post('/api/seasonal/announcements/{id}/dismiss', [\App\Http\Controllers\User\SeasonalController::class, 'dismissAnnouncement'])->name('seasonal.announcements.dismiss');
+    Route::get('/api/seasonal/claims/history', [\App\Http\Controllers\User\SeasonalController::class, 'history'])->name('seasonal.claims.history');
+
     Route::get('/dashboard', function () {
         $user = auth()->user();
 
@@ -413,6 +419,25 @@ Route::middleware(['auth', CheckAccountStatus::class, 'admin'])->prefix('admin')
     Route::get('/crypto', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'index'])->name('admin.crypto.index');
     Route::post('/crypto/{id}/reconcile', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'reconcile'])->name('admin.crypto.reconcile');
     Route::post('/crypto/toggle-service', [\App\Http\Controllers\Admin\CryptoAdminController::class, 'toggleService'])->name('admin.crypto.toggle');
+
+    // Seasonal Modes, Animations & Celebration Gifts Admin Management
+    Route::get('/seasonal', [\App\Http\Controllers\Admin\SeasonalController::class, 'index'])->name('admin.seasonal.index');
+    Route::post('/seasonal/modes', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeMode'])->name('admin.seasonal.modes.store');
+    Route::post('/seasonal/modes/deactivate-all', [\App\Http\Controllers\Admin\SeasonalController::class, 'deactivateAllModes'])->name('admin.seasonal.modes.deactivate-all');
+    Route::post('/seasonal/modes/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'updateMode'])->name('admin.seasonal.modes.update');
+    Route::post('/seasonal/modes/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleMode'])->name('admin.seasonal.modes.toggle');
+    Route::delete('/seasonal/modes/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'destroyMode'])->name('admin.seasonal.modes.destroy');
+
+    Route::post('/seasonal/gifts', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeGift'])->name('admin.seasonal.gifts.store');
+    Route::post('/seasonal/gifts/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'updateGift'])->name('admin.seasonal.gifts.update');
+    Route::post('/seasonal/gifts/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleGift'])->name('admin.seasonal.gifts.toggle');
+    Route::post('/seasonal/gifts/{id}/distribute', [\App\Http\Controllers\Admin\SeasonalController::class, 'distributeGift'])->name('admin.seasonal.gifts.distribute');
+    Route::delete('/seasonal/gifts/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'destroyGift'])->name('admin.seasonal.gifts.destroy');
+
+    Route::post('/seasonal/announcements', [\App\Http\Controllers\Admin\SeasonalController::class, 'storeAnnouncement'])->name('admin.seasonal.announcements.store');
+    Route::post('/seasonal/announcements/{id}/toggle', [\App\Http\Controllers\Admin\SeasonalController::class, 'toggleAnnouncement'])->name('admin.seasonal.announcements.toggle');
+    Route::post('/seasonal/announcements/{id}/broadcast', [\App\Http\Controllers\Admin\SeasonalController::class, 'broadcastAnnouncement'])->name('admin.seasonal.announcements.broadcast');
+    Route::delete('/seasonal/announcements/{id}', [\App\Http\Controllers\Admin\SeasonalController::class, 'destroyAnnouncement'])->name('admin.seasonal.announcements.destroy');
 });
 
 // Quidax Webhook Endpoints

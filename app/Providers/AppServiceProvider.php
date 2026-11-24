@@ -252,6 +252,23 @@ class AppServiceProvider extends ServiceProvider
                 });
             }
             $view->with('publicPromos', $publicPromos);
+
+            // Inject active seasonal celebration mode & user preferences
+            $activeSeasonalMode = null;
+            $seasonalUserPref = null;
+            try {
+                if (Schema::hasTable('seasonal_modes')) {
+                    $previewId = request()->query('seasonal_preview');
+                    $activeSeasonalMode = app(\App\Services\SeasonalEngineService::class)->resolveActiveMode(auth()->user(), $previewId);
+                    if ($activeSeasonalMode && auth()->check() && Schema::hasTable('seasonal_user_preferences')) {
+                        $seasonalUserPref = \App\Models\SeasonalUserPreference::where('user_id', auth()->id())->first();
+                    }
+                }
+            } catch (\Throwable $e) {
+                $activeSeasonalMode = null;
+            }
+            $view->with('activeSeasonalMode', $activeSeasonalMode);
+            $view->with('seasonalUserPref', $seasonalUserPref);
         });
     }
 }

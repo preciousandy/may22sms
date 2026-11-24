@@ -1300,6 +1300,29 @@
     <!-- ===== HERO SECTION ===== -->
     <section class="edus-hero" id="home">
         <div class="container">
+            <!-- Seasonal Celebration Banner on Homepage if active -->
+            @if(isset($activeSeasonalMode) && $activeSeasonalMode && $activeSeasonalMode->banner_enabled && $activeSeasonalMode->shouldDisplayOnPage('home'))
+                <div class="mb-8 rounded-3xl p-4 sm:p-5 text-white shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border border-white/20"
+                     style="background: {{ $activeSeasonalMode->banner_gradient ?: "linear-gradient(135deg, {$activeSeasonalMode->secondary_color} 0%, {$activeSeasonalMode->primary_color} 100%)" }};">
+                    <div class="flex items-center gap-3.5">
+                        <span class="text-3xl shrink-0">{{ $activeSeasonalMode->icon ?: '🎉' }}</span>
+                        <div>
+                            <span class="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-400 text-slate-950 mb-1">
+                                {{ $activeSeasonalMode->badge_text ?: $activeSeasonalMode->name }}
+                            </span>
+                            <h3 class="text-base sm:text-lg font-black text-white leading-snug" style="color: #ffffff !important;">
+                                {{ $activeSeasonalMode->greeting_title }}
+                            </h3>
+                            <p class="text-xs text-white/90 mt-0.5">{{ $activeSeasonalMode->greeting_subtitle }}</p>
+                        </div>
+                    </div>
+                    <a href="{{ auth()->check() ? '/dashboard#seasonal-celebration-hub' : '/register' }}"
+                       class="px-5 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs uppercase tracking-wider shrink-0 transition shadow-md">
+                        🎁 Claim Seasonal Gift &rarr;
+                    </a>
+                </div>
+            @endif
+
             <!-- Announcement Banner if active -->
             @if(($announcementEnabled ?? false) && !empty($announcementText ?? ''))
                 <div class="mb-8 inline-flex items-center gap-3 bg-teal-50 border border-teal-200/80 px-5 py-3 rounded-full text-teal-900 shadow-sm">
